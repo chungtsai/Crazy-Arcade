@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>爆爆王 (Crazy Arcade) - 海盜14</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+  <!-- PixiJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app-container">
+    <!-- Lobby / Start Screen -->
+    <div id="lobby-screen" class="screen active">
+      <div class="glass-panel main-menu">
+        <h1 class="game-title animate-title">CRAZY ARCADE</h1>
+        <h2 class="sub-title">海盜 14 經典關卡</h2>
+        
+        <div class="game-mode-preview">
+          <div class="map-badge">Patrit 14</div>
+          <div class="map-description">經典海14地圖 • 單人挑戰 vs CPU AI</div>
+        </div>
+
+        <div class="character-selection">
+          <h3>選擇你的角色</h3>
+          <div class="char-grid">
+            <div class="char-card active" data-char="dao">
+              <div class="char-avatar dao-color"></div>
+              <div class="char-name">藍寶 (Dao)</div>
+              <div class="char-stats">
+                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 60%"></div></div></div>
+                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+              </div>
+            </div>
+            
+            <div class="char-card" data-char="bazzi">
+              <div class="char-avatar bazzi-color"></div>
+              <div class="char-name">困寶 (Bazzi)</div>
+              <div class="char-stats">
+                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 80%"></div></div></div>
+                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 30%"></div></div></div>
+                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 50%"></div></div></div>
+              </div>
+            </div>
+
+            <div class="char-card" data-char="marid">
+              <div class="char-avatar marid-color"></div>
+              <div class="char-name">妮妮 (Marid)</div>
+              <div class="char-stats">
+                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 70%"></div></div></div>
+                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cpu-selection">
+          <h3>選擇 CPU 人數</h3>
+          <div class="cpu-options">
+            <button class="cpu-opt-btn active" data-cpu="1">1 人</button>
+            <button class="cpu-opt-btn" data-cpu="2">2 人</button>
+            <button class="cpu-opt-btn" data-cpu="3">3 人</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="start-btn" class="btn primary btn-glow">開始遊戲</button>
+        </div>
+
+        <div class="instructions-panel">
+          <h4>遊戲控制說明</h4>
+          <div class="controls-guide">
+            <div class="control-item"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> <span>/</span> <span class="key">↑</span><span class="key">↓</span><span class="key">←</span><span class="key">→</span> <span>移動角色</span></div>
+            <div class="control-item"><span class="key space">Space</span> <span>放置水泡</span></div>
+            <div class="control-item"><span class="key">N</span> <span>使用針 (若被困住)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Game Screen -->
+    <div id="game-screen" class="screen">
+      <div class="game-header glass-panel">
+        <div class="player-info-container">
+          <div class="player-profile">
+            <div class="profile-avatar dao-color" id="player-hud-avatar"></div>
+            <div class="profile-details">
+              <div class="profile-name">Player (Dao)</div>
+              <div class="hud-item-stats">
+                <span class="hud-stat" id="hud-p-bubble">🎈 1/1</span>
+                <span class="hud-stat" id="hud-p-len">📏 2</span>
+                <span class="hud-stat" id="hud-p-speed">⚡ 2.5</span>
+                <span class="hud-stat" id="hud-p-needle">📍 1</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="game-timer" id="timer-display">03:00</div>
+
+        <div class="player-info-container cpu-info" id="cpu-hud-container">
+          <!-- Dynamic CPU profiles will be inserted here -->
+        </div>
+      </div>
+
+      <div class="canvas-wrapper">
+        <div id="pixi-canvas-container"></div>
+      </div>
+
+      <div class="hud-footer">
+        <button id="exit-btn" class="btn secondary">返回大廳</button>
+        <button id="restart-btn" class="btn secondary">重新開始</button>
+      </div>
+    </div>
+
+    <!-- Game Over / Win Overlay -->
+    <div id="result-overlay" class="overlay">
+      <div class="glass-panel result-panel">
+        <h2 id="result-title">YOU WIN!</h2>
+        <p id="result-message">恭喜你成功擊敗了 CPU 玩家！</p>
+        <div class="result-stats">
+          <div class="res-stat-row"><span>遊戲時間：</span><span id="res-time">01:45</span></div>
+          <div class="res-stat-row"><span>破壞木箱：</span><span id="res-crates">12 個</span></div>
+        </div>
+        <div class="actions">
+          <button id="play-again-btn" class="btn primary">再玩一次</button>
+          <button id="result-exit-btn" class="btn secondary">回到大廳</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
