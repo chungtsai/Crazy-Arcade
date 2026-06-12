@@ -195,6 +195,23 @@ class SoundFX {
     osc.start();
     osc.stop(this.ctx.currentTime + 0.05);
   }
+
+  playRescue() {
+    this.init();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now); // C5
+    osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+    osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+    osc.start();
+    osc.stop(now + 0.3);
+  }
 }
 
 const sfx = new SoundFX();
@@ -276,7 +293,10 @@ const CHARACTER_CONFIGS = {
 const CPU_START_POSITIONS = [
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 0, dirY: -1 }, // Bottom-Right
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: TILE_SIZE * 0.5 + 2, dirX: -1, dirY: 0 },              // Top-Right
-  { x: TILE_SIZE * 0.5 + 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 1, dirY: 0 }               // Bottom-Left
+  { x: TILE_SIZE * 0.5 + 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 1, dirY: 0 },               // Bottom-Left
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 6.5, dirX: 0, dirY: 1 },                                     // Center
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 2.5, dirX: -1, dirY: 0 },                                    // Top-Middle
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 10.5, dirX: 1, dirY: 0 }                                     // Bottom-Middle
 ];
 
 // Items
@@ -294,6 +314,7 @@ class Game {
     this.player = null;
     this.cpus = [];
     this.cpuCount = 3;
+    this.cpuTeams = ['blue', 'blue', 'blue', 'blue', 'blue']; // Default all CPUs to blue team
     this.bubbles = [];
     this.flames = [];
     this.items = [];
@@ -327,6 +348,7 @@ class Game {
         cards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         this.selectedChar = card.dataset.char;
+        this.updateTeamSlotsUI();
       });
     });
 
@@ -347,6 +369,7 @@ class Game {
         cpuBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.cpuCount = parseInt(btn.dataset.cpu, 10);
+        this.updateTeamSlotsUI();
       });
     });
 
@@ -376,6 +399,53 @@ class Game {
       this.lobbyScreen.classList.add('active');
       this.gameScreen.classList.remove('active');
     });
+
+    this.updateTeamSlotsUI();
+  }
+
+  updateTeamSlotsUI() {
+    const container = document.getElementById('team-slots');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // 1. Add Player Slot
+    const playerCard = document.createElement('div');
+    playerCard.className = 'team-slot-card';
+    const playerCharName = CHARACTER_CONFIGS[this.selectedChar].name;
+    playerCard.innerHTML = `
+      <div class="slot-avatar ${this.selectedChar}-color"></div>
+      <div class="slot-name">玩家 (${playerCharName})</div>
+      <button class="team-toggle-btn team-red" disabled>紅隊</button>
+    `;
+    container.appendChild(playerCard);
+
+    // 2. Add CPU Slots
+    const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => char !== this.selectedChar);
+    for (let i = 0; i < this.cpuCount; i++) {
+      const cpuChar = availableCPUChars[i % availableCPUChars.length];
+      const cpuCharName = CHARACTER_CONFIGS[cpuChar].name;
+      const team = this.cpuTeams[i] || 'blue';
+      const teamLabel = team === 'red' ? '紅隊' : '藍隊';
+      const teamClass = team === 'red' ? 'team-red' : 'team-blue';
+
+      const cpuCard = document.createElement('div');
+      cpuCard.className = 'team-slot-card';
+      cpuCard.innerHTML = `
+        <div class="slot-avatar ${cpuChar}-color"></div>
+        <div class="slot-name">CPU ${i + 1} (${cpuCharName})</div>
+        <button class="team-toggle-btn ${teamClass}" data-index="${i}">${teamLabel}</button>
+      `;
+
+      // Event listener for toggle button
+      cpuCard.querySelector('.team-toggle-btn').addEventListener('click', (e) => {
+        sfx.playClick();
+        const idx = parseInt(e.target.dataset.index, 10);
+        this.cpuTeams[idx] = this.cpuTeams[idx] === 'red' ? 'blue' : 'red';
+        this.updateTeamSlotsUI();
+      });
+
+      container.appendChild(cpuCard);
+    }
   }
 
   setupMobileControls() {
@@ -696,10 +766,21 @@ class Game {
       graphics: new PIXI.Graphics(),
       placedCount: 0,
       dirX: 0,
-      dirY: 1
+      dirY: 1,
+      team: 'red' // Player is always Red Team
     };
 
     this.characterContainer.addChild(this.player.graphics);
+
+    // Apply player HUD team styling
+    const playerProfileEl = document.querySelector('.player-profile');
+    if (playerProfileEl) {
+      playerProfileEl.className = 'player-profile team-red';
+      const nameEl = playerProfileEl.querySelector('.profile-name');
+      if (nameEl) {
+        nameEl.innerHTML = `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${CHARACTER_CONFIGS[this.selectedChar].name}`;
+      }
+    }
 
     this.cpus = [];
     const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => char !== this.selectedChar);
@@ -731,7 +812,8 @@ class Game {
         placeCooldown: 0.5,
         decisionTimer: 0,
         dirX: pos.dirX,
-        dirY: pos.dirY
+        dirY: pos.dirY,
+        team: this.cpuTeams[i] || 'blue' // Get configured team
       };
       this.characterContainer.addChild(cpu.graphics);
       this.cpus.push(cpu);
@@ -741,12 +823,14 @@ class Game {
     cpuHudContainer.innerHTML = '';
     this.cpus.forEach(cpu => {
       const cpuProfile = document.createElement('div');
-      cpuProfile.className = 'player-profile cpu';
+      cpuProfile.className = `player-profile cpu team-${cpu.team}`;
       cpuProfile.id = `cpu-profile-${cpu.id}`;
       
+      const teamLabel = cpu.team === 'red' ? '<span style="color: #ff8080; font-weight: bold;">[紅隊]</span>' : '<span style="color: #809fff; font-weight: bold;">[藍隊]</span>';
+
       cpuProfile.innerHTML = `
         <div class="profile-details">
-          <div class="profile-name">${CHARACTER_CONFIGS[cpu.charKey].name} (CPU ${cpu.id})</div>
+          <div class="profile-name">${teamLabel} ${CHARACTER_CONFIGS[cpu.charKey].name} (CPU ${cpu.id})</div>
           <div class="hud-item-stats">
             <span class="hud-stat" id="hud-c-bubble-${cpu.id}">🎈 0/${cpu.maxBubbles}</span>
             <span class="hud-stat" id="hud-c-len-${cpu.id}">📏 ${cpu.bubbleLength}</span>
@@ -1359,40 +1443,79 @@ class Game {
       }
 
       if (cpu.aiState === 'patrol') {
-        const playerCol = Math.floor(this.player.x / TILE_SIZE);
-        const playerRow = Math.floor(this.player.y / TILE_SIZE);
-        
-        // Attack/Bubble Placement checks
-        const distToPlayer = Math.abs(cpuCol - playerCol) + Math.abs(cpuRow - playerRow);
-        
-        // Check if we should place bubble to trap player or destroy crate
-        let triggerPlace = false;
-        
-        // Adjacent crate check (Runs 5 times/sec, so 0.15 is about 60% chance/sec)
-        const neighbors = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-        for (const [dx, dy] of neighbors) {
-          const nc = cpuCol + dx;
-          const nr = cpuRow + dy;
-          if (nc >= 0 && nc < GRID_COLS && nr >= 0 && nr < GRID_ROWS) {
-            if (this.grid[nr][nc] === 2 && Math.random() < 0.15) {
-              triggerPlace = true;
+        const teammates = [this.player, ...this.cpus].filter(c => c.team === cpu.team && c !== cpu);
+        const enemies = [this.player, ...this.cpus].filter(c => c.team !== cpu.team && c.state !== 'dead');
+
+        // 1. Check for trapped teammates to rescue
+        const trappedTeammate = teammates.find(t => t.state === 'trapped');
+
+        let targetCol = null;
+        let targetRow = null;
+        let isRescuing = false;
+
+        if (trappedTeammate) {
+          targetCol = Math.floor(trappedTeammate.x / TILE_SIZE);
+          targetRow = Math.floor(trappedTeammate.y / TILE_SIZE);
+          isRescuing = true;
+        } else {
+          // 2. Target the nearest active enemy
+          let nearestEnemy = null;
+          let minDistance = Infinity;
+
+          for (const enemy of enemies) {
+            const enemyCol = Math.floor(enemy.x / TILE_SIZE);
+            const enemyRow = Math.floor(enemy.y / TILE_SIZE);
+            const dist = Math.abs(cpuCol - enemyCol) + Math.abs(cpuRow - enemyRow);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearestEnemy = enemy;
             }
+          }
+
+          if (nearestEnemy) {
+            targetCol = Math.floor(nearestEnemy.x / TILE_SIZE);
+            targetRow = Math.floor(nearestEnemy.y / TILE_SIZE);
           }
         }
 
-        // Close to player check (Runs 5 times/sec, so 0.25 probability)
-        if (distToPlayer <= 3 && Math.random() < 0.25) {
-          triggerPlace = true;
+        // Attack/Bubble Placement checks
+        let triggerPlace = false;
+
+        if (!isRescuing && targetCol !== null) {
+          const distToTarget = Math.abs(cpuCol - targetCol) + Math.abs(cpuRow - targetRow);
+          
+          // Adjacent crate check (Runs 5 times/sec, so 0.15 is about 60% chance/sec)
+          const neighbors = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+          for (const [dx, dy] of neighbors) {
+            const nc = cpuCol + dx;
+            const nr = cpuRow + dy;
+            if (nc >= 0 && nc < GRID_COLS && nr >= 0 && nr < GRID_ROWS) {
+              if (this.grid[nr][nc] === 2 && Math.random() < 0.15) {
+                // Ensure no teammates are nearby
+                const teammateNearby = teammates.some(t => {
+                  const tc = Math.floor(t.x / TILE_SIZE);
+                  const tr = Math.floor(t.y / TILE_SIZE);
+                  return Math.abs(cpuCol - tc) + Math.abs(cpuRow - tr) <= 2;
+                });
+                if (!teammateNearby) {
+                  triggerPlace = true;
+                }
+              }
+            }
+          }
+
+          // Close to enemy check (Runs 5 times/sec, so 0.25 probability)
+          if (distToTarget <= 3 && Math.random() < 0.25) {
+            triggerPlace = true;
+          }
         }
 
         // Run validation: If we place a bubble on cpuCol, cpuRow, can we escape safely?
         if (triggerPlace && cpu.placedCount < cpu.maxBubbles && cpu.placeCooldown <= 0) {
-          // Simulate placing a bubble at current tile, including its full hypothetical blast range
           const hypotheticalDanger = this.getDangerousZonesForBomb(cpuCol, cpuRow, cpu.bubbleLength);
           const tempBubbles = [...dangerZones, ...hypotheticalDanger];
           const escapeTest = this.findClosestSafeTile(cpuCol, cpuRow, tempBubbles);
           if (escapeTest && escapeTest.path.length > 0) {
-            // Yes, safe getaway exists! Place it.
             this.placeBubble(cpu);
             cpu.placeCooldown = 2.0; // Prevent spamming
             cpu.aiState = 'escape';
@@ -1400,13 +1523,16 @@ class Game {
           }
         }
 
-        // If patrolling and path completed, find next target (Player or Items or Crates)
+        // If patrolling and path completed, find next target
         if (cpu.movePath.length === 0) {
-          let targetCol = playerCol;
-          let targetRow = playerRow;
+          if (targetCol === null) {
+            // Fallback to player
+            targetCol = Math.floor(this.player.x / TILE_SIZE);
+            targetRow = Math.floor(this.player.y / TILE_SIZE);
+          }
 
-          // Occasionally go for items instead of player
-          if (this.items.length > 0 && Math.random() < 0.5) {
+          // Occasionally go for items instead of enemies
+          if (!isRescuing && this.items.length > 0 && Math.random() < 0.5) {
             const nearestItem = this.items.reduce((prev, curr) => {
               const d1 = Math.abs(cpuCol - prev.col) + Math.abs(cpuRow - prev.row);
               const d2 = Math.abs(cpuCol - curr.col) + Math.abs(cpuRow - curr.row);
@@ -1707,6 +1833,14 @@ class Game {
       g.lineTo(char.x + 1, char.y - 12);
       g.lineStyle(0);
 
+      // Draw Team Indicator Above Trapped Bubble
+      const teamColor = char.team === 'red' ? 0xff4d4d : 0x4d4dff;
+      g.beginFill(teamColor);
+      g.moveTo(char.x - 6, char.y - char.radius * 1.3 - 22);
+      g.lineTo(char.x + 6, char.y - char.radius * 1.3 - 22);
+      g.lineTo(char.x, char.y - char.radius * 1.3 - 16);
+      g.endFill();
+
       return;
     }
 
@@ -1731,50 +1865,92 @@ class Game {
     g.beginFill(0xffffff, 0.35);
     g.drawCircle(char.x - char.radius * 0.4, char.y - char.radius * 0.4, char.radius * 0.25);
     g.endFill();
+
+    // Draw Team Indicator Above Head
+    const teamColor = char.team === 'red' ? 0xff4d4d : 0x4d4dff;
+    g.beginFill(teamColor);
+    g.moveTo(char.x - 6, char.y - char.radius - 12);
+    g.lineTo(char.x + 6, char.y - char.radius - 12);
+    g.lineTo(char.x, char.y - char.radius - 6);
+    g.endFill();
+  }
+
+  showFloatingText(x, y, textStr, colorHex) {
+    try {
+      const style = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: colorHex,
+        stroke: '#000000',
+        strokeThickness: 3
+      });
+      const text = new PIXI.Text(textStr, style);
+      text.anchor.set(0.5);
+      text.x = x;
+      text.y = y;
+      this.characterContainer.addChild(text);
+
+      let frames = 45;
+      const anim = () => {
+        text.y -= 0.8;
+        text.alpha = frames / 45;
+        frames--;
+        if (frames <= 0) {
+          this.characterContainer.removeChild(text);
+          this.app.ticker.remove(anim);
+          text.destroy();
+        }
+      };
+      this.app.ticker.add(anim);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   checkGameResolutions() {
-    // 1. Check if a normal player collides with a trapped CPU to pop it
-    if (this.player.state === 'normal') {
-      for (const cpu of this.cpus) {
-        if (cpu.state === 'trapped') {
-          const dist = Math.hypot(this.player.x - cpu.x, this.player.y - cpu.y);
-          if (dist < (this.player.radius + cpu.radius)) {
-            cpu.state = 'dead';
+    const chars = [this.player, ...this.cpus];
+
+    // 1. Resolve character-to-character collision for Trapped states (Rescue / Kill)
+    for (let i = 0; i < chars.length; i++) {
+      const charA = chars[i];
+      if (charA.state !== 'normal') continue;
+
+      for (let j = 0; j < chars.length; j++) {
+        if (i === j) continue;
+        const charB = chars[j];
+        if (charB.state !== 'trapped') continue;
+
+        const dist = Math.hypot(charA.x - charB.x, charA.y - charB.y);
+        if (dist < (charA.radius + charB.radius)) {
+          if (charA.team === charB.team) {
+            // Teammate rescue!
+            charB.state = 'normal';
+            charB.trapTimer = 0;
+            sfx.playRescue();
+            this.showFloatingText(charB.x, charB.y - 20, "RESCUE!", 0x80ff80);
+            this.updateHUD();
+          } else {
+            // Enemy kill!
+            charB.state = 'dead';
             sfx.playPopTrap();
-            // Check if this was the last CPU
-            if (this.cpus.every(c => c.state === 'dead')) {
-              this.endGame('win', 'all_cpus_dead');
-              return;
-            }
+            this.showFloatingText(charB.x, charB.y - 20, "OUT!", 0xff8080);
+            this.updateHUD();
           }
         }
       }
     }
 
-    // 2. Check if a normal CPU collides with a trapped player to pop them
-    if (this.player.state === 'trapped') {
-      for (const cpu of this.cpus) {
-        if (cpu.state === 'normal') {
-          const dist = Math.hypot(this.player.x - cpu.x, this.player.y - cpu.y);
-          if (dist < (this.player.radius + cpu.radius)) {
-            this.player.state = 'dead';
-            sfx.playPopTrap();
-            this.endGame('lose', 'cpu_popped_player');
-            return;
-          }
-        }
-      }
-    }
+    // 2. Check winning/losing condition based on team survival
+    const redTeamAlive = chars.some(c => c.team === 'red' && c.state !== 'dead');
+    const blueTeamAlive = chars.some(c => c.team === 'blue' && c.state !== 'dead');
 
-    // 3. Check survival count
-    const allCpusDead = this.cpus.every(c => c.state === 'dead');
-    if (this.player.state === 'dead' && allCpusDead) {
-      this.endGame('draw', 'both_dead');
-    } else if (this.player.state === 'dead') {
-      this.endGame('lose', 'player_dead');
-    } else if (allCpusDead) {
-      this.endGame('win', 'cpu_dead');
+    if (!redTeamAlive && !blueTeamAlive) {
+      this.endGame('draw', 'both_teams_dead');
+    } else if (!redTeamAlive) {
+      this.endGame('lose', 'red_team_dead');
+    } else if (!blueTeamAlive) {
+      this.endGame('win', 'blue_team_dead');
     }
   }
 
@@ -1807,21 +1983,17 @@ class Game {
     resCrates.textContent = `${this.cratesDestroyedCount} 個`;
 
     if (outcome === 'win') {
-      title.textContent = 'YOU WIN!';
+      title.textContent = '紅隊獲勝!';
       title.style.color = 'var(--accent-blue)';
-      if (this.cpuCount > 1) {
-        msg.textContent = `水落石出！你成功擊敗了所有 ${this.cpuCount} 位 CPU 玩家，重溫經典海盜 14 的榮耀！`;
-      } else {
-        msg.textContent = '水落石出！你成功擊敗了 CPU 玩家，重溫經典海盜 14 的榮耀！';
-      }
+      msg.textContent = '恭喜你！紅隊成功消滅了藍隊所有成員，獲得了最終的勝利！';
     } else if (outcome === 'lose') {
-      title.textContent = 'YOU LOSE';
+      title.textContent = '藍隊獲勝';
       title.style.color = 'var(--accent-pink)';
-      msg.textContent = '太可惜了！被 CPU 給困住引爆。加油，再試一次一定能贏！';
+      msg.textContent = '太可惜了！藍隊成功擊敗了紅隊，下次再努力配合隊友贏回來吧！';
     } else {
-      title.textContent = 'DRAW GAME';
+      title.textContent = '平局';
       title.style.color = 'var(--text-light)';
-      msg.textContent = '雙方不分勝負，攜手步入水花世界。';
+      msg.textContent = '雙方全軍覆沒，平分秋色！';
     }
 
     this.resultOverlay.classList.add('active');
