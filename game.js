@@ -325,14 +325,22 @@ class Game {
   }
 
   setupMobileControls() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                     ('ontouchstart' in window) ||
-                     (navigator.maxTouchPoints > 0) ||
-                     (window.innerWidth <= 768);
+    const checkMobile = () => {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                       ('ontouchstart' in window) ||
+                       (navigator.maxTouchPoints > 0) ||
+                       (window.innerWidth <= 768);
 
-    if (isMobile) {
-      document.body.classList.add('is-mobile');
-    }
+      if (isMobile) {
+        document.body.classList.add('is-mobile');
+      } else {
+        document.body.classList.remove('is-mobile');
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
 
     const bindControl = (id, key, isAction = false) => {
       const btn = document.getElementById(id);
