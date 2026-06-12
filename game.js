@@ -30,42 +30,84 @@ class SoundFX {
 
   playExplosion() {
     this.init();
-    const bufferSize = this.ctx.sampleRate * 0.4;
+    const now = this.ctx.currentTime;
+    
+    // 1. Low-frequency blast rumble (using a triangle oscillator sweep)
+    const blastOsc = this.ctx.createOscillator();
+    const blastGain = this.ctx.createGain();
+    blastOsc.type = 'triangle';
+    blastOsc.frequency.setValueAtTime(165, now);
+    blastOsc.frequency.exponentialRampToValueAtTime(35, now + 0.4);
+    blastGain.gain.setValueAtTime(0.45, now);
+    blastGain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+    
+    blastOsc.connect(blastGain);
+    blastGain.connect(this.ctx.destination);
+    blastOsc.start(now);
+    blastOsc.stop(now + 0.5);
+
+    // 2. High-frequency water splash spray (using noise and bandpass filters)
+    const bufferSize = this.ctx.sampleRate * 0.65;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
       data[i] = Math.random() * 2 - 1;
     }
+    
+    const noiseSource = this.ctx.createBufferSource();
+    noiseSource.buffer = buffer;
+    
+    const noiseFilter = this.ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(800, now);
+    noiseFilter.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
+    noiseFilter.frequency.linearRampToValueAtTime(280, now + 0.6);
+    noiseFilter.Q.setValueAtTime(3.5, now);
+    
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.38, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.005, now + 0.65);
+    
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.ctx.destination);
+    
+    noiseSource.start(now);
+    noiseSource.stop(now + 0.65);
 
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
+    // 3. Wet bubble pop chirp (sine wave pitch sweep downwards)
+    const popOsc = this.ctx.createOscillator();
+    const popGain = this.ctx.createGain();
+    popOsc.type = 'sine';
+    popOsc.frequency.setValueAtTime(620, now);
+    popOsc.frequency.exponentialRampToValueAtTime(85, now + 0.18);
+    popGain.gain.setValueAtTime(0.28, now);
+    popGain.gain.linearRampToValueAtTime(0.001, now + 0.2);
+    
+    popOsc.connect(popGain);
+    popGain.connect(this.ctx.destination);
+    popOsc.start(now);
+    popOsc.stop(now + 0.2);
+  }
 
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 400;
-
+  playTick(remainingTime) {
+    this.init();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    noise.connect(filter);
-    filter.connect(gain);
+    osc.connect(gain);
     gain.connect(this.ctx.destination);
-
-    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
-
-    noise.start();
-    noise.stop(this.ctx.currentTime + 0.4);
-
-    const bass = this.ctx.createOscillator();
-    const bassGain = this.ctx.createGain();
-    bass.connect(bassGain);
-    bassGain.connect(this.ctx.destination);
-    bass.type = 'triangle';
-    bass.frequency.setValueAtTime(120, this.ctx.currentTime);
-    bass.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.25);
-    bassGain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-    bassGain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
-    bass.start();
-    bass.stop(this.ctx.currentTime + 0.25);
+    
+    // Pitch goes up as remaining time goes down
+    const pitch = 650 + (2.5 - remainingTime) * 320; 
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(pitch, now);
+    
+    gain.gain.setValueAtTime(0.045, now);
+    gain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+    
+    osc.start();
+    osc.stop(now + 0.06);
   }
 
   playItemCollect() {
@@ -671,7 +713,8 @@ class Game {
       owner: character,
       graphics: new PIXI.Graphics(),
       scalePhase: 0,
-      allowedCharacters: allowed
+      allowedCharacters: allowed,
+      nextTickTime: 2.0
     };
 
     this.bubbleContainer.addChild(bubble.graphics);
@@ -1273,6 +1316,18 @@ class Game {
       const b = this.bubbles[i];
       b.timer -= dt;
       b.scalePhase += dt * 8;
+
+      // Play ticking warning sound that speeds up as explosion approaches
+      if (b.nextTickTime !== undefined && b.timer <= b.nextTickTime) {
+        sfx.playTick(b.nextTickTime);
+        if (b.nextTickTime > 1.0) {
+          b.nextTickTime -= 0.5;
+        } else if (b.nextTickTime > 0.4) {
+          b.nextTickTime -= 0.3;
+        } else {
+          b.nextTickTime -= 0.15;
+        }
+      }
 
       if (b.timer <= 0) {
         this.explodeBubble(b);
