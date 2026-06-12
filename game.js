@@ -564,6 +564,31 @@ class Game {
 
     character.placedCount++;
     
+    const allowed = [];
+    const characters = [this.player, ...this.cpus];
+    const bubbleLeft = col * TILE_SIZE;
+    const bubbleRight = (col + 1) * TILE_SIZE;
+    const bubbleTop = row * TILE_SIZE;
+    const bubbleBottom = (row + 1) * TILE_SIZE;
+
+    for (const char of characters) {
+      if (char.state === 'dead') continue;
+      const charLeft = char.x - char.radius * 0.8;
+      const charRight = char.x + char.radius * 0.8;
+      const charTop = char.y - char.radius * 0.8;
+      const charBottom = char.y + char.radius * 0.8;
+
+      const isOverlapping = charLeft < bubbleRight && charRight > bubbleLeft &&
+                            charTop < bubbleBottom && charBottom > bubbleTop;
+      if (isOverlapping) {
+        allowed.push(char);
+      }
+    }
+
+    if (!allowed.includes(character)) {
+      allowed.push(character);
+    }
+
     const bubble = {
       col,
       row,
@@ -574,7 +599,7 @@ class Game {
       owner: character,
       graphics: new PIXI.Graphics(),
       scalePhase: 0,
-      allowedCharacters: [character]
+      allowedCharacters: allowed
     };
 
     this.bubbleContainer.addChild(bubble.graphics);
