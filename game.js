@@ -229,6 +229,7 @@ class Game {
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     window.addEventListener('keyup', this.handleKeyUp.bind(this));
 
+    this.setupMobileControls();
     this.setupLobby();
   }
 
@@ -279,6 +280,77 @@ class Game {
       this.lobbyScreen.classList.add('active');
       this.gameScreen.classList.remove('active');
     });
+  }
+
+  setupMobileControls() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                     ('ontouchstart' in window) ||
+                     (navigator.maxTouchPoints > 0) ||
+                     (window.innerWidth <= 768);
+
+    if (isMobile) {
+      document.body.classList.add('is-mobile');
+    }
+
+    const bindControl = (id, key, isAction = false) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+
+      const handleStart = (e) => {
+        e.preventDefault();
+        sfx.init();
+        
+        if (isAction) {
+          if (key === 'Space') {
+            if (this.gameActive && this.player && this.player.state === 'normal') {
+              this.placeBubble(this.player);
+            }
+          } else if (key === 'KeyN') {
+            if (this.gameActive && this.player && this.player.state === 'trapped') {
+              if (this.player.needles > 0) {
+                this.player.needles--;
+                this.player.state = 'normal';
+                sfx.playNeedle();
+                this.updateHUD();
+              }
+            }
+          }
+        } else {
+          this.keys[key] = true;
+        }
+        btn.classList.add('active');
+      };
+
+      const handleEnd = (e) => {
+        e.preventDefault();
+        if (!isAction) {
+          this.keys[key] = false;
+        }
+        btn.classList.remove('active');
+      };
+
+      btn.addEventListener('touchstart', handleStart, { passive: false });
+      btn.addEventListener('touchend', handleEnd, { passive: false });
+      btn.addEventListener('touchcancel', handleEnd, { passive: false });
+
+      btn.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+          handleStart(e);
+        }
+      });
+      const mouseUpHandler = (e) => {
+        handleEnd(e);
+      };
+      btn.addEventListener('mouseup', mouseUpHandler);
+      btn.addEventListener('mouseleave', mouseUpHandler);
+    };
+
+    bindControl('btn-up', 'ArrowUp');
+    bindControl('btn-down', 'ArrowDown');
+    bindControl('btn-left', 'ArrowLeft');
+    bindControl('btn-right', 'ArrowRight');
+    bindControl('btn-bomb', 'Space', true);
+    bindControl('btn-needle', 'KeyN', true);
   }
 
   restartGame() {

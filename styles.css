@@ -613,3 +613,307 @@ body {
   text-decoration: line-through;
   transition: all 0.4s ease;
 }
+
+/* --- MOBILE RESPONSIVE STYLES --- */
+
+/* Base hide for mobile controller */
+.mobile-controls-container {
+  display: none;
+}
+
+/* Mobile modifications */
+body.is-mobile {
+  overflow-y: auto !important;
+  align-items: flex-start !important;
+  padding: 10px 0 !important;
+  min-height: 100vh;
+}
+
+body.is-mobile #app-container {
+  height: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+body.is-mobile .screen {
+  position: relative;
+  transform: none;
+  width: 100%;
+  max-width: 100%;
+  opacity: 1;
+  pointer-events: auto;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+body.is-mobile .screen:not(.active) {
+  display: none !important;
+}
+
+/* Glass panel responsive */
+body.is-mobile .glass-panel {
+  padding: 1.25rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 95vw;
+}
+
+/* Lobby screen scaling */
+body.is-mobile .main-menu {
+  gap: 1.25rem;
+}
+
+body.is-mobile .game-title {
+  font-size: 2.2rem;
+  letter-spacing: 2px;
+}
+
+body.is-mobile .sub-title {
+  margin-top: -1rem;
+  font-size: 1rem;
+}
+
+body.is-mobile .char-grid {
+  gap: 0.5rem;
+}
+
+body.is-mobile .char-card {
+  padding: 0.75rem 0.5rem;
+  border-radius: 10px;
+}
+
+body.is-mobile .char-avatar {
+  width: 45px;
+  height: 45px;
+}
+
+body.is-mobile .char-name {
+  font-size: 0.85rem;
+}
+
+body.is-mobile .char-stats {
+  display: none; /* Hide stats in selection to fit grid on smaller screens */
+}
+
+body.is-mobile .cpu-selection {
+  margin-top: 0.5rem;
+}
+
+body.is-mobile .cpu-opt-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+body.is-mobile .instructions-panel {
+  display: none; /* Hide keyboard guides */
+}
+
+/* Game screen scaling */
+body.is-mobile .game-header {
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 95vw;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+body.is-mobile .player-profile .profile-name {
+  display: none; /* Hide name to save space */
+}
+
+body.is-mobile .player-profile {
+  gap: 0.4rem;
+}
+
+body.is-mobile .profile-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+body.is-mobile .hud-item-stats {
+  gap: 0.35rem;
+}
+
+body.is-mobile .hud-stat {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.3rem;
+}
+
+body.is-mobile .game-timer {
+  font-size: 1.3rem;
+  text-shadow: none;
+}
+
+body.is-mobile #cpu-hud-container {
+  flex-direction: row !important;
+  gap: 0.4rem;
+  max-height: none;
+  align-items: center;
+}
+
+body.is-mobile #cpu-hud-container .player-profile.cpu {
+  text-align: left;
+  flex-direction: row-reverse;
+}
+
+/* Canvas Scaling */
+body.is-mobile .canvas-wrapper {
+  width: 95vw;
+  height: calc(95vw * 624 / 720);
+  max-width: 720px;
+  max-height: 624px;
+  border-width: 2px;
+}
+
+body.is-mobile #pixi-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Virtual Controls Styling */
+body.is-mobile .mobile-controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 95vw;
+  max-width: 720px;
+  padding: 8px;
+  background: rgba(10, 25, 50, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 180, 255, 0.15);
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+
+body.is-mobile .dpad-container {
+  display: grid;
+  grid-template-areas:
+    ".    up    ."
+    "left .     right"
+    ".    down  .";
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 6px;
+}
+
+body.is-mobile .mobile-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+  touch-action: manipulation;
+  transition: all 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.is-mobile .mobile-btn:active,
+body.is-mobile .mobile-btn.active {
+  background: rgba(0, 210, 255, 0.25) !important;
+  border-color: rgba(0, 210, 255, 0.5) !important;
+  color: #fff;
+  transform: scale(0.92);
+}
+
+body.is-mobile .dpad-btn.up { grid-area: up; }
+body.is-mobile .dpad-btn.left { grid-area: left; }
+body.is-mobile .dpad-btn.right { grid-area: right; }
+body.is-mobile .dpad-btn.down { grid-area: down; }
+
+body.is-mobile .dpad-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+body.is-mobile .action-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+body.is-mobile .action-btn {
+  flex-direction: column;
+  gap: 2px;
+}
+
+body.is-mobile .action-btn.needle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.1) 0%, rgba(0, 210, 255, 0.3) 100%);
+  border: 1.5px solid rgba(0, 210, 255, 0.3);
+}
+
+body.is-mobile .action-btn.needle:active,
+body.is-mobile .action-btn.needle.active {
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.3) 0%, rgba(0, 210, 255, 0.6) 100%) !important;
+  border-color: rgba(0, 210, 255, 0.8) !important;
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+}
+
+body.is-mobile .action-btn.bomb {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 0, 127, 0.15) 0%, rgba(255, 0, 127, 0.4) 100%);
+  border: 2px solid rgba(255, 0, 127, 0.4);
+}
+
+body.is-mobile .action-btn.bomb:active,
+body.is-mobile .action-btn.bomb.active {
+  background: linear-gradient(135deg, rgba(255, 0, 127, 0.4) 0%, rgba(255, 0, 127, 0.7) 100%) !important;
+  border-color: rgba(255, 0, 127, 0.9) !important;
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.6);
+}
+
+body.is-mobile .action-btn .btn-emoji {
+  font-size: 1.2rem;
+}
+body.is-mobile .action-btn.bomb .btn-emoji {
+  font-size: 1.7rem;
+}
+
+body.is-mobile .action-btn .btn-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Footer buttons scaling */
+body.is-mobile .hud-footer {
+  width: 100%;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+body.is-mobile .hud-footer .btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+/* Results panel scaling */
+body.is-mobile .result-panel {
+  width: 90vw;
+  padding: 1.5rem 1rem;
+  gap: 1rem;
+}
+
+body.is-mobile #result-title {
+  font-size: 2rem;
+}

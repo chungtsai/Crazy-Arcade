@@ -110,6 +110,34 @@
         <div id="pixi-canvas-container"></div>
       </div>
 
+      <!-- Mobile virtual controller (visible only on mobile) -->
+      <div id="mobile-controller" class="mobile-controls-container">
+        <div class="dpad-container">
+          <button id="btn-up" class="mobile-btn dpad-btn up" data-key="ArrowUp">
+            <svg viewBox="0 0 24 24" class="icon"><path d="M12 8l-6 6h12z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-left" class="mobile-btn dpad-btn left" data-key="ArrowLeft">
+            <svg viewBox="0 0 24 24" class="icon"><path d="M8 12l6-6v12z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-right" class="mobile-btn dpad-btn right" data-key="ArrowRight">
+            <svg viewBox="0 0 24 24" class="icon"><path d="M16 12l-6-6v12z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-down" class="mobile-btn dpad-btn down" data-key="ArrowDown">
+            <svg viewBox="0 0 24 24" class="icon"><path d="M12 16l-6-6h12z" fill="currentColor"/></svg>
+          </button>
+        </div>
+        <div class="action-container">
+          <button id="btn-needle" class="mobile-btn action-btn needle" data-key="KeyN">
+            <span class="btn-emoji">📍</span>
+            <span class="btn-label">針</span>
+          </button>
+          <button id="btn-bomb" class="mobile-btn action-btn bomb" data-key="Space">
+            <span class="btn-emoji">🎈</span>
+            <span class="btn-label">放置水泡</span>
+          </button>
+        </div>
+      </div>
+
       <div class="hud-footer">
         <button id="exit-btn" class="btn secondary">返回大廳</button>
         <button id="restart-btn" class="btn secondary">重新開始</button>
