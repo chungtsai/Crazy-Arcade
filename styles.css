@@ -958,15 +958,225 @@ body.is-mobile .mobile-controls-container {
   box-sizing: border-box;
 }
 
-body.is-mobile .dpad-container {
-  display: grid;
+/* Joystick and DPad Styles */
+body.is-mobile .joystick-wrapper-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+body.is-mobile .control-toggle-btn {
+  background: rgba(10, 30, 60, 0.7);
+  border: 1.5px solid rgba(0, 180, 255, 0.35);
+  color: #a0dfff;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  touch-action: none;
+}
+
+body.is-mobile .control-toggle-btn:active {
+  background: rgba(0, 180, 255, 0.25);
+  border-color: rgba(0, 210, 255, 0.7);
+  color: #fff;
+  transform: scale(0.95);
+  box-shadow: 0 0 10px rgba(0, 180, 255, 0.4);
+}
+
+body.is-mobile .joystick-wrapper {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none;
+}
+
+/* Joystick Mode */
+body.is-mobile .joystick-base {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 30, 60, 0.55) 0%, rgba(5, 15, 35, 0.75) 100%);
+  border: 2px solid rgba(0, 180, 255, 0.35);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.4), 
+    inset 0 0 15px rgba(0, 180, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  touch-action: none;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+body.is-mobile .joystick-wrapper.joystick-mode .joystick-base {
+  display: block;
+}
+
+body.is-mobile .joystick-base:active,
+body.is-mobile .joystick-base.active {
+  border-color: rgba(0, 210, 255, 0.7);
+  box-shadow: 
+    0 8px 32px 0 rgba(0, 0, 0, 0.4), 
+    0 0 16px rgba(0, 180, 255, 0.35),
+    inset 0 0 20px rgba(0, 180, 255, 0.25);
+}
+
+body.is-mobile .joystick-knob {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  left: 50%;
+  top: 50%;
+  margin-left: -25px;
+  margin-top: -25px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 230, 255, 1) 0%, rgba(10, 45, 90, 0.95) 75%);
+  border: 1.5px solid rgba(0, 230, 255, 0.6);
+  box-shadow: 
+    0 5px 12px rgba(0, 0, 0, 0.55), 
+    0 0 8px rgba(0, 230, 255, 0.45);
+  touch-action: none;
+  pointer-events: none;
+  transition: transform 0.05s ease-out;
+}
+
+body.is-mobile .joystick-arrow {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: rgba(0, 180, 255, 0.55);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+body.is-mobile .joystick-arrow svg {
+  width: 20px;
+  height: 20px;
+}
+
+body.is-mobile .joystick-arrow.up {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+body.is-mobile .joystick-arrow.down {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+body.is-mobile .joystick-arrow.left {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+body.is-mobile .joystick-arrow.right {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+body.is-mobile .joystick-arrow.active {
+  color: #00f0ff;
+  filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.8));
+}
+
+body.is-mobile .joystick-arrow.up.active {
+  transform: translateX(-50%) translateY(-3px) scale(1.15);
+}
+body.is-mobile .joystick-arrow.down.active {
+  transform: translateX(-50%) translateY(3px) scale(1.15);
+}
+body.is-mobile .joystick-arrow.left.active {
+  transform: translateY(-50%) translateX(-3px) scale(1.15);
+}
+body.is-mobile .joystick-arrow.right.active {
+  transform: translateY(-50%) translateX(3px) scale(1.15);
+}
+
+/* Classic DPAD Mode */
+body.is-mobile .dpad-base {
+  display: none;
   grid-template-areas:
     ".    up    ."
-    "left .     right"
+    "left center right"
     ".    down  .";
-  grid-template-columns: repeat(3, 44px);
-  grid-template-rows: repeat(3, 44px);
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
   gap: 5px;
+  justify-content: center;
+  align-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+body.is-mobile .joystick-wrapper.dpad-mode .dpad-base {
+  display: grid;
+}
+
+body.is-mobile .dpad-btn {
+  background: rgba(15, 30, 60, 0.65);
+  border: 1.5px solid rgba(0, 180, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  box-shadow: inset 0 0 6px rgba(0, 180, 255, 0.05);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.is-mobile .dpad-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+body.is-mobile .dpad-btn.up {
+  grid-area: up;
+  border-radius: 12px 12px 4px 4px;
+}
+body.is-mobile .dpad-btn.left {
+  grid-area: left;
+  border-radius: 12px 4px 4px 12px;
+}
+body.is-mobile .dpad-btn.right {
+  grid-area: right;
+  border-radius: 4px 12px 12px 4px;
+}
+body.is-mobile .dpad-btn.down {
+  grid-area: down;
+  border-radius: 4px 4px 12px 12px;
+}
+body.is-mobile .dpad-btn.center-dot {
+  grid-area: center;
+  background: rgba(10, 20, 40, 0.5);
+  border: 1px dashed rgba(0, 180, 255, 0.15);
+  border-radius: 4px;
+}
+
+body.is-mobile .dpad-btn.active {
+  background: radial-gradient(circle, rgba(0, 210, 255, 0.6) 0%, rgba(0, 130, 255, 0.7) 100%) !important;
+  border-color: rgba(0, 210, 255, 0.85) !important;
+  box-shadow: 
+    0 0 12px rgba(0, 210, 255, 0.45),
+    inset 0 0 8px rgba(255, 255, 255, 0.3);
+  color: #fff;
+  transform: scale(0.95);
 }
 
 body.is-mobile .mobile-btn {
@@ -993,55 +1203,57 @@ body.is-mobile .mobile-btn.active {
   transform: scale(0.9);
 }
 
-body.is-mobile .dpad-btn.up { grid-area: up; }
-body.is-mobile .dpad-btn.left { grid-area: left; }
-body.is-mobile .dpad-btn.right { grid-area: right; }
-body.is-mobile .dpad-btn.down { grid-area: down; }
-
-body.is-mobile .dpad-btn svg {
-  width: 20px;
-  height: 20px;
-}
-
 body.is-mobile .action-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 body.is-mobile .action-btn {
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 body.is-mobile .action-btn.needle {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(0, 210, 255, 0.1) 0%, rgba(0, 210, 255, 0.25) 100%);
-  border: 1.5px solid rgba(0, 210, 255, 0.3);
+  background: radial-gradient(circle, rgba(230, 180, 0, 0.45) 0%, rgba(80, 50, 0, 0.75) 100%) !important;
+  border: 1.5px solid rgba(250, 200, 0, 0.45) !important;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 0 10px rgba(250, 200, 0, 0.15);
 }
 
 body.is-mobile .action-btn.needle:active,
 body.is-mobile .action-btn.needle.active {
-  background: linear-gradient(135deg, rgba(0, 210, 255, 0.3) 0%, rgba(0, 210, 255, 0.6) 100%) !important;
-  border-color: rgba(0, 210, 255, 0.8) !important;
-  box-shadow: 0 0 12px rgba(0, 210, 255, 0.5);
+  background: radial-gradient(circle, rgba(250, 220, 0, 0.7) 0%, rgba(120, 80, 0, 0.85) 100%) !important;
+  border-color: rgba(255, 230, 0, 0.9) !important;
+  box-shadow: 
+    0 0 16px rgba(250, 200, 0, 0.5),
+    inset 0 0 10px rgba(255, 255, 255, 0.35) !important;
+  transform: scale(0.9);
 }
 
 body.is-mobile .action-btn.bomb {
   width: 66px;
   height: 66px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255, 0, 127, 0.15) 0%, rgba(255, 0, 127, 0.35) 100%);
-  border: 2px solid rgba(255, 0, 127, 0.4);
+  background: radial-gradient(circle, rgba(0, 190, 255, 0.45) 0%, rgba(0, 60, 120, 0.75) 100%) !important;
+  border: 1.5px solid rgba(0, 200, 255, 0.5) !important;
+  box-shadow: 
+    0 6px 16px rgba(0, 0, 0, 0.4),
+    inset 0 0 12px rgba(0, 200, 255, 0.15);
 }
 
 body.is-mobile .action-btn.bomb:active,
 body.is-mobile .action-btn.bomb.active {
-  background: linear-gradient(135deg, rgba(255, 0, 127, 0.4) 0%, rgba(255, 0, 127, 0.65) 100%) !important;
-  border-color: rgba(255, 0, 127, 0.8) !important;
-  box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
+  background: radial-gradient(circle, rgba(0, 230, 255, 0.7) 0%, rgba(0, 90, 180, 0.85) 100%) !important;
+  border-color: rgba(0, 240, 255, 0.9) !important;
+  box-shadow: 
+    0 0 20px rgba(0, 210, 255, 0.6),
+    inset 0 0 12px rgba(255, 255, 255, 0.4) !important;
+  transform: scale(0.9);
 }
 
 body.is-mobile .action-btn .btn-emoji {
@@ -1264,12 +1476,10 @@ body.is-mobile #result-title {
     z-index: 15;
   }
 
-  body.is-mobile #game-screen .dpad-container {
-    pointer-events: auto; /* Enable touch for DPAD */
+  body.is-mobile #game-screen .joystick-wrapper-container {
+    pointer-events: auto; /* Enable touch for Joystick wrapper container */
     margin-left: 24px;
     margin-bottom: 24px;
-    grid-template-columns: repeat(3, 46px);
-    grid-template-rows: repeat(3, 46px);
   }
 
   body.is-mobile #game-screen .action-container {

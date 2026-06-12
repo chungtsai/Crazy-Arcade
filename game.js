@@ -396,40 +396,32 @@ class Game {
     window.addEventListener('resize', checkMobile);
     window.addEventListener('orientationchange', checkMobile);
 
-    const bindControl = (id, key, isAction = false) => {
+    const bindActionButton = (id, key) => {
       const btn = document.getElementById(id);
       if (!btn) return;
 
       const handleStart = (e) => {
         e.preventDefault();
         sfx.init();
-        
-        if (isAction) {
-          if (key === 'Space') {
-            if (this.gameActive && this.player && this.player.state === 'normal') {
-              this.placeBubble(this.player);
-            }
-          } else if (key === 'KeyN') {
-            if (this.gameActive && this.player && this.player.state === 'trapped') {
-              if (this.player.needles > 0) {
-                this.player.needles--;
-                this.player.state = 'normal';
-                sfx.playNeedle();
-                this.updateHUD();
-              }
+        if (key === 'Space') {
+          if (this.gameActive && this.player && this.player.state === 'normal') {
+            this.placeBubble(this.player);
+          }
+        } else if (key === 'KeyN') {
+          if (this.gameActive && this.player && this.player.state === 'trapped') {
+            if (this.player.needles > 0) {
+              this.player.needles--;
+              this.player.state = 'normal';
+              sfx.playNeedle();
+              this.updateHUD();
             }
           }
-        } else {
-          this.keys[key] = true;
         }
         btn.classList.add('active');
       };
 
       const handleEnd = (e) => {
         e.preventDefault();
-        if (!isAction) {
-          this.keys[key] = false;
-        }
         btn.classList.remove('active');
       };
 
@@ -449,12 +441,192 @@ class Game {
       btn.addEventListener('mouseleave', mouseUpHandler);
     };
 
-    bindControl('btn-up', 'ArrowUp');
-    bindControl('btn-down', 'ArrowDown');
-    bindControl('btn-left', 'ArrowLeft');
-    bindControl('btn-right', 'ArrowRight');
-    bindControl('btn-bomb', 'Space', true);
-    bindControl('btn-needle', 'KeyN', true);
+    bindActionButton('btn-bomb', 'Space');
+    bindActionButton('btn-needle', 'KeyN');
+
+    const joystickWrapper = document.getElementById('joystick-wrapper');
+    const joystickKnob = document.getElementById('joystick-knob');
+    const toggleBtn = document.getElementById('control-mode-toggle');
+
+    if (!joystickWrapper) return;
+
+    this.mobileControlMode = localStorage.getItem('mobileControlMode') || 'joystick';
+
+    const applyControlMode = () => {
+      if (this.mobileControlMode === 'joystick') {
+        joystickWrapper.classList.add('joystick-mode');
+        joystickWrapper.classList.remove('dpad-mode');
+        if (toggleBtn) {
+          toggleBtn.querySelector('.toggle-icon').textContent = '🎮';
+          toggleBtn.querySelector('.toggle-text').textContent = '搖桿模式';
+        }
+      } else {
+        joystickWrapper.classList.remove('joystick-mode');
+        joystickWrapper.classList.add('dpad-mode');
+        if (toggleBtn) {
+          toggleBtn.querySelector('.toggle-icon').textContent = '🎛️';
+          toggleBtn.querySelector('.toggle-text').textContent = '按鍵模式';
+        }
+      }
+      this.keys['ArrowUp'] = false;
+      this.keys['ArrowDown'] = false;
+      this.keys['ArrowLeft'] = false;
+      this.keys['ArrowRight'] = false;
+      if (joystickKnob) joystickKnob.style.transform = 'translate3d(0, 0, 0)';
+      
+      joystickWrapper.querySelectorAll('.joystick-arrow, .dpad-btn').forEach(el => {
+        el.classList.remove('active');
+      });
+    };
+
+    applyControlMode();
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        sfx.init();
+        this.mobileControlMode = this.mobileControlMode === 'joystick' ? 'dpad' : 'joystick';
+        localStorage.setItem('mobileControlMode', this.mobileControlMode);
+        applyControlMode();
+        
+        if ('vibrate' in navigator) {
+          navigator.vibrate([15, 30, 15]);
+        }
+      });
+    }
+
+    let joystickActive = false;
+    let joystickPointerId = null;
+    let joystickCenter = { x: 0, y: 0 };
+    let activeDirections = { up: false, down: false, left: false, right: false };
+
+    const handlePointerDown = (e) => {
+      if (joystickActive) return;
+      
+      joystickActive = true;
+      joystickPointerId = e.pointerId;
+      joystickWrapper.setPointerCapture(e.pointerId);
+      
+      const rect = joystickWrapper.getBoundingClientRect();
+      joystickCenter = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+
+      sfx.init();
+      handlePointerMove(e);
+    };
+
+    const handlePointerMove = (e) => {
+      if (!joystickActive || e.pointerId !== joystickPointerId) return;
+
+      const dx = e.clientX - joystickCenter.x;
+      const dy = e.clientY - joystickCenter.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      const maxRadius = 45; 
+      const deadzone = 12;
+      
+      let nx = 0;
+      let ny = 0;
+      
+      if (distance > 0) {
+        nx = dx / distance;
+        ny = dy / distance;
+      }
+
+      if (this.mobileControlMode === 'joystick' && joystickKnob) {
+        const knobX = Math.min(distance, maxRadius) * nx;
+        const knobY = Math.min(distance, maxRadius) * ny;
+        joystickKnob.style.transform = `translate3d(${knobX}px, ${knobY}px, 0)`;
+      }
+
+      const threshold = 0.38;
+      
+      const newUp = distance >= deadzone && ny < -threshold;
+      const newDown = distance >= deadzone && ny > threshold;
+      const newLeft = distance >= deadzone && nx < -threshold;
+      const newRight = distance >= deadzone && nx > threshold;
+
+      const dirChanged = (
+        newUp !== activeDirections.up ||
+        newDown !== activeDirections.down ||
+        newLeft !== activeDirections.left ||
+        newRight !== activeDirections.right
+      );
+
+      if (dirChanged) {
+        activeDirections = { up: newUp, down: newDown, left: newLeft, right: newRight };
+        
+        this.keys['ArrowUp'] = newUp;
+        this.keys['ArrowDown'] = newDown;
+        this.keys['ArrowLeft'] = newLeft;
+        this.keys['ArrowRight'] = newRight;
+
+        if (this.mobileControlMode === 'joystick') {
+          const arrowUp = joystickWrapper.querySelector('.joystick-arrow.up');
+          const arrowDown = joystickWrapper.querySelector('.joystick-arrow.down');
+          const arrowLeft = joystickWrapper.querySelector('.joystick-arrow.left');
+          const arrowRight = joystickWrapper.querySelector('.joystick-arrow.right');
+
+          if (arrowUp) arrowUp.classList.toggle('active', newUp);
+          if (arrowDown) arrowDown.classList.toggle('active', newDown);
+          if (arrowLeft) arrowLeft.classList.toggle('active', newLeft);
+          if (arrowRight) arrowRight.classList.toggle('active', newRight);
+        } else {
+          const btnUp = joystickWrapper.querySelector('.dpad-btn.up');
+          const btnDown = joystickWrapper.querySelector('.dpad-btn.down');
+          const btnLeft = joystickWrapper.querySelector('.dpad-btn.left');
+          const btnRight = joystickWrapper.querySelector('.dpad-btn.right');
+
+          if (btnUp) btnUp.classList.toggle('active', newUp);
+          if (btnDown) btnDown.classList.toggle('active', newDown);
+          if (btnLeft) btnLeft.classList.toggle('active', newLeft);
+          if (btnRight) btnRight.classList.toggle('active', newRight);
+        }
+
+        if ('vibrate' in navigator && (newUp || newDown || newLeft || newRight)) {
+          navigator.vibrate(8);
+        }
+      }
+    };
+
+    const handlePointerUp = (e) => {
+      if (!joystickActive || e.pointerId !== joystickPointerId) return;
+      
+      joystickActive = false;
+      joystickPointerId = null;
+      
+      try {
+        joystickWrapper.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        // ignore
+      }
+
+      this.keys['ArrowUp'] = false;
+      this.keys['ArrowDown'] = false;
+      this.keys['ArrowLeft'] = false;
+      this.keys['ArrowRight'] = false;
+
+      activeDirections = { up: false, down: false, left: false, right: false };
+
+      if (joystickKnob) {
+        joystickKnob.style.transform = 'translate3d(0, 0, 0)';
+      }
+
+      joystickWrapper.querySelectorAll('.joystick-arrow, .dpad-btn').forEach(el => {
+        el.classList.remove('active');
+      });
+
+      if ('vibrate' in navigator) {
+        navigator.vibrate(5);
+      }
+    };
+
+    joystickWrapper.addEventListener('pointerdown', handlePointerDown);
+    joystickWrapper.addEventListener('pointermove', handlePointerMove);
+    joystickWrapper.addEventListener('pointerup', handlePointerUp);
+    joystickWrapper.addEventListener('pointercancel', handlePointerUp);
   }
 
   restartGame() {

@@ -123,20 +123,50 @@
 
       <!-- Mobile virtual controller (visible only on mobile) -->
       <div id="mobile-controller" class="mobile-controls-container">
-        <div class="dpad-container">
-          <button id="btn-up" class="mobile-btn dpad-btn up" data-key="ArrowUp">
-            <svg viewBox="0 0 24 24" class="icon"><path d="M12 8l-6 6h12z" fill="currentColor"/></svg>
+        <!-- Control Mode Toggle & Joystick Area -->
+        <div class="joystick-wrapper-container">
+          <button id="control-mode-toggle" class="control-toggle-btn">
+            <span class="toggle-icon">🎮</span>
+            <span class="toggle-text">搖桿模式</span>
           </button>
-          <button id="btn-left" class="mobile-btn dpad-btn left" data-key="ArrowLeft">
-            <svg viewBox="0 0 24 24" class="icon"><path d="M8 12l6-6v12z" fill="currentColor"/></svg>
-          </button>
-          <button id="btn-right" class="mobile-btn dpad-btn right" data-key="ArrowRight">
-            <svg viewBox="0 0 24 24" class="icon"><path d="M16 12l-6-6v12z" fill="currentColor"/></svg>
-          </button>
-          <button id="btn-down" class="mobile-btn dpad-btn down" data-key="ArrowDown">
-            <svg viewBox="0 0 24 24" class="icon"><path d="M12 16l-6-6h12z" fill="currentColor"/></svg>
-          </button>
+          
+          <div class="joystick-wrapper joystick-mode" id="joystick-wrapper">
+            <!-- Joystick View -->
+            <div class="joystick-base">
+              <div class="joystick-arrow up">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M12 8l-6 6h12z" fill="currentColor"/></svg>
+              </div>
+              <div class="joystick-arrow left">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M8 12l6-6v12z" fill="currentColor"/></svg>
+              </div>
+              <div class="joystick-arrow right">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M16 12l-6-6v12z" fill="currentColor"/></svg>
+              </div>
+              <div class="joystick-arrow down">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M12 16l-6-6h12z" fill="currentColor"/></svg>
+              </div>
+              <div class="joystick-knob" id="joystick-knob"></div>
+            </div>
+
+            <!-- Classic DPAD View -->
+            <div class="dpad-base">
+              <div class="dpad-btn up" data-key="ArrowUp">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M12 8l-6 6h12z" fill="currentColor"/></svg>
+              </div>
+              <div class="dpad-btn left" data-key="ArrowLeft">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M8 12l6-6v12z" fill="currentColor"/></svg>
+              </div>
+              <div class="dpad-btn center-dot"></div>
+              <div class="dpad-btn right" data-key="ArrowRight">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M16 12l-6-6v12z" fill="currentColor"/></svg>
+              </div>
+              <div class="dpad-btn down" data-key="ArrowDown">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M12 16l-6-6h12z" fill="currentColor"/></svg>
+              </div>
+            </div>
+          </div>
         </div>
+
         <div class="action-container">
           <button id="btn-needle" class="mobile-btn action-btn needle" data-key="KeyN">
             <span class="btn-emoji">📍</span>
