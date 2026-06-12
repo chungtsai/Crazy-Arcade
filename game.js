@@ -206,22 +206,65 @@ const GRID_ROWS = 13;
 const GAME_WIDTH = GRID_COLS * TILE_SIZE;
 const GAME_HEIGHT = GRID_ROWS * TILE_SIZE;
 
-// Original Sea 14 Map layout (15x13)
-const MAP_LAYOUT = [
-  [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0],
-  [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
-  [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
-  [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
-  [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
-  [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
-  [2, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 2],
-  [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
-  [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
-  [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
-  [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
-  [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
-  [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
-];
+// Map configurations containing layout and visual themes
+const MAPS_CONFIG = {
+  sea14: {
+    name: '海盜 14',
+    badge: 'Patrit 14',
+    layout: [
+      [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0],
+      [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
+      [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
+      [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
+      [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
+      [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
+      [2, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 2],
+      [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
+      [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
+      [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
+      [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
+      [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
+      [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
+    ],
+    wallColor: 0x4a5d6e,
+    wallBorderColor: 0x7c94a8,
+    wallInnerColor: 0x273542,
+    crateColor: 0xbf7130,
+    crateBorderColor: 0x824413,
+    crateInnerColor: 0x542a0b,
+    bgTileColorDark: 0x0a1c36,
+    bgTileColorLight: 0x07152a,
+    bgGridColor: 0x0d284f
+  },
+  village10: {
+    name: '村莊 10',
+    badge: 'Village 10',
+    layout: [
+      [0, 0, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 0, 0],
+      [0, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 0],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [2, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [2, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2],
+      [2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+      [0, 1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 0],
+      [0, 0, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 0, 0]
+    ],
+    wallColor: 0xe05638,       // Red roof houses
+    wallBorderColor: 0xf7a361, // Light orange wall
+    wallInnerColor: 0xfce497,  // Yellow brick window/facade
+    crateColor: 0xe6b450,       // Light yellow wood box
+    crateBorderColor: 0xb58010, // Medium wood border
+    crateInnerColor: 0x7a5405,  // Dark wood details
+    bgTileColorDark: 0x337d43,  // Dark green grass
+    bgTileColorLight: 0x3b8c4c, // Light green grass
+    bgGridColor: 0x1f5c2e       // Deep grass divider lines
+  }
+};
 
 // Character configs
 const CHARACTER_CONFIGS = {
@@ -250,7 +293,7 @@ class Game {
     this.grid = [];
     this.player = null;
     this.cpus = [];
-    this.cpuCount = 1;
+    this.cpuCount = 3;
     this.bubbles = [];
     this.flames = [];
     this.items = [];
@@ -262,6 +305,7 @@ class Game {
     this.timerDisplay = document.getElementById('timer-display');
     
     this.selectedChar = 'dao';
+    this.selectedMap = 'sea14';
     this.timeLeft = 180;
     this.timerInterval = null;
     this.gameActive = false;
@@ -283,6 +327,16 @@ class Game {
         cards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         this.selectedChar = card.dataset.char;
+      });
+    });
+
+    const mapCards = document.querySelectorAll('.map-card');
+    mapCards.forEach(card => {
+      card.addEventListener('click', () => {
+        sfx.playClick();
+        mapCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedMap = card.dataset.map;
       });
     });
 
@@ -412,19 +466,24 @@ class Game {
     this.gameScreen.classList.add('active');
     this.resultOverlay.classList.remove('active');
 
+    const mapConf = MAPS_CONFIG[this.selectedMap];
+
     if (!this.app) {
       this.app = new PIXI.Application({
         width: GAME_WIDTH,
         height: GAME_HEIGHT,
-        backgroundColor: 0x0c1e3b,
+        backgroundColor: mapConf.bgTileColorLight,
         antialias: true
       });
       document.getElementById('pixi-canvas-container').appendChild(this.app.view);
     } else {
       this.app.stage.removeChildren();
+      if (this.app.renderer && this.app.renderer.background) {
+        this.app.renderer.background.color = mapConf.bgTileColorLight;
+      }
     }
 
-    this.grid = JSON.parse(JSON.stringify(MAP_LAYOUT));
+    this.grid = JSON.parse(JSON.stringify(mapConf.layout));
     this.bubbles = [];
     this.flames = [];
     this.items = [];
@@ -590,15 +649,16 @@ class Game {
   drawBackground() {
     this.backgroundContainer.removeChildren();
     const bg = new PIXI.Graphics();
+    const mapConf = MAPS_CONFIG[this.selectedMap];
     
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         const isDark = (r + c) % 2 === 0;
-        bg.beginFill(isDark ? 0x0a1c36 : 0x07152a);
+        bg.beginFill(isDark ? mapConf.bgTileColorDark : mapConf.bgTileColorLight);
         bg.drawRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         bg.endFill();
 
-        bg.lineStyle(1, 0x0d284f, 0.4);
+        bg.lineStyle(1, mapConf.bgGridColor, 0.4);
         bg.drawRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         bg.lineStyle(0);
       }
@@ -609,6 +669,7 @@ class Game {
   drawMap() {
     this.mapContainer.removeChildren();
     const mainG = new PIXI.Graphics();
+    const mapConf = MAPS_CONFIG[this.selectedMap];
 
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
@@ -617,29 +678,29 @@ class Game {
         const y = r * TILE_SIZE;
 
         if (cell === 1) {
-          mainG.beginFill(0x4a5d6e);
+          mainG.beginFill(mapConf.wallColor);
           mainG.drawRoundedRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 8);
           mainG.endFill();
 
-          mainG.lineStyle(2, 0x7c94a8, 0.8);
+          mainG.lineStyle(2, mapConf.wallBorderColor, 0.8);
           mainG.drawRoundedRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 8);
           
           mainG.lineStyle(0);
-          mainG.beginFill(0x273542);
+          mainG.beginFill(mapConf.wallInnerColor);
           mainG.drawCircle(x + TILE_SIZE/2, y + TILE_SIZE/2, TILE_SIZE/4);
           mainG.endFill();
         } else if (cell === 2) {
-          mainG.beginFill(0xbf7130);
+          mainG.beginFill(mapConf.crateColor);
           mainG.drawRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
           mainG.endFill();
 
-          mainG.lineStyle(3, 0x824413, 0.9);
+          mainG.lineStyle(3, mapConf.crateBorderColor, 0.9);
           mainG.moveTo(x + 4, y + 4);
           mainG.lineTo(x + TILE_SIZE - 4, y + TILE_SIZE - 4);
           mainG.moveTo(x + TILE_SIZE - 4, y + 4);
           mainG.lineTo(x + 4, y + TILE_SIZE - 4);
 
-          mainG.lineStyle(2, 0x542a0b, 1);
+          mainG.lineStyle(2, mapConf.crateInnerColor, 1);
           mainG.drawRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
           mainG.lineStyle(0);
         }
