@@ -294,7 +294,7 @@ const CPU_START_POSITIONS = [
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 0, dirY: -1 }, // Bottom-Right
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: TILE_SIZE * 0.5 + 2, dirX: -1, dirY: 0 },              // Top-Right
   { x: TILE_SIZE * 0.5 + 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 1, dirY: 0 },               // Bottom-Left
-  { x: TILE_SIZE * 3.5, y: TILE_SIZE * 6.5, dirX: 1, dirY: 0 },                                     // Center (Moved to Column 3 to avoid getting stuck inside the Sea 14 center ship)
+  { x: TILE_SIZE * 5, y: TILE_SIZE * 5, dirX: 1, dirY: 0 }, // Center safe spot for Village10
   { x: TILE_SIZE * 7.5, y: TILE_SIZE * 2.5, dirX: -1, dirY: 0 },                                    // Top-Middle
   { x: TILE_SIZE * 7.5, y: TILE_SIZE * 10.5, dirX: 1, dirY: 0 }                                     // Bottom-Middle
 ];
