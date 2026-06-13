@@ -1255,6 +1255,14 @@ class Game {
       this.pauseModal.classList.remove('active');
     }
 
+    // Reset previous gamepad button states to prevent accidental bubble placement on menu exit
+    if (this.prevGamepadStates) {
+      this.prevGamepadStates.forEach(state => {
+        state.placeBubblePressed = true;
+        state.useItemPressed = true;
+      });
+    }
+
     const mapConf = MAPS_CONFIG[this.selectedMap];
     
     // Dynamically update document title on game start
