@@ -1955,7 +1955,7 @@ class Game {
       }
     }
 
-    this.moveCharacter(this.player, playerDx * cappedDelta, playerDy * cappedDelta);
+    this.moveCharacter(this.player, playerDx * this.cappedDelta, playerDy * this.cappedDelta);
 
     if (this.cpus && !this.gameEnding) {
       for (const cpu of this.cpus) {
