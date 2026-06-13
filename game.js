@@ -230,17 +230,17 @@ const MAPS_CONFIG = {
     badge: 'Patrit 14',
     layout: [
       [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0],
-      [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
+      [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
       [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
-      [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
+      [2, 2, 0, 1, 2, 2, 2, 0, 2, 2, 2, 1, 0, 2, 2],
       [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
-      [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
+      [2, 2, 0, 2, 0, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2],
       [2, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 2],
-      [2, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 2],
+      [2, 2, 0, 2, 0, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2],
       [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
-      [2, 1, 0, 1, 2, 1, 2, 0, 2, 1, 2, 1, 0, 1, 2],
+      [2, 2, 0, 1, 2, 2, 2, 0, 2, 2, 2, 1, 0, 2, 2],
       [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
-      [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 0],
+      [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
       [0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0]
     ],
     wallColor: 0x4a5d6e,
@@ -304,7 +304,9 @@ const ITEM_TYPES = {
   BUBBLE_UP: 3,
   LENGTH_UP: 4,
   SPEED_UP: 5,
-  NEEDLE: 6
+  NEEDLE: 6,
+  DART: 7,
+  PET: 8
 };
 
 class Game {
@@ -324,6 +326,8 @@ class Game {
     this.gameScreen = document.getElementById('game-screen');
     this.resultOverlay = document.getElementById('result-overlay');
     this.timerDisplay = document.getElementById('timer-display');
+    this.pauseModal = document.getElementById('pause-modal');
+    this.menuBtn = document.getElementById('menu-btn');
     
     this.selectedChar = 'dao';
     this.selectedMap = 'sea14';
@@ -378,15 +382,52 @@ class Game {
       this.startGame();
     });
 
-    document.getElementById('exit-btn').addEventListener('click', () => {
-      sfx.playClick();
-      this.endGame(null, 'abort');
-    });
+    // Menu button triggers pause modal
+    if (this.menuBtn) {
+      this.menuBtn.addEventListener('click', () => {
+        sfx.playClick();
+        if (this.gameActive && !this.gameEnding) {
+          this.gameActive = false;
+          if (this.pauseModal) {
+            this.pauseModal.classList.add('active');
+          }
+        }
+      });
+    }
 
-    document.getElementById('restart-btn').addEventListener('click', () => {
-      sfx.playClick();
-      this.restartGame();
-    });
+    // Modal action buttons
+    const modalResumeBtn = document.getElementById('modal-resume-btn');
+    if (modalResumeBtn) {
+      modalResumeBtn.addEventListener('click', () => {
+        sfx.playClick();
+        this.gameActive = true;
+        if (this.pauseModal) {
+          this.pauseModal.classList.remove('active');
+        }
+      });
+    }
+
+    const modalRestartBtn = document.getElementById('modal-restart-btn');
+    if (modalRestartBtn) {
+      modalRestartBtn.addEventListener('click', () => {
+        sfx.playClick();
+        if (this.pauseModal) {
+          this.pauseModal.classList.remove('active');
+        }
+        this.restartGame();
+      });
+    }
+
+    const modalExitBtn = document.getElementById('modal-exit-btn');
+    if (modalExitBtn) {
+      modalExitBtn.addEventListener('click', () => {
+        sfx.playClick();
+        if (this.pauseModal) {
+          this.pauseModal.classList.remove('active');
+        }
+        this.endGame(null, 'abort');
+      });
+    }
 
     document.getElementById('play-again-btn').addEventListener('click', () => {
       sfx.playClick();
@@ -478,14 +519,7 @@ class Game {
             this.placeBubble(this.player);
           }
         } else if (key === 'KeyN') {
-          if (this.gameActive && this.player && this.player.state === 'trapped') {
-            if (this.player.needles > 0) {
-              this.player.needles--;
-              this.player.state = 'normal';
-              sfx.playNeedle();
-              this.updateHUD();
-            }
-          }
+          this.usePlayerNeedle();
         }
         btn.classList.add('active');
       };
@@ -707,6 +741,9 @@ class Game {
     this.lobbyScreen.classList.remove('active');
     this.gameScreen.classList.add('active');
     this.resultOverlay.classList.remove('active');
+    if (this.pauseModal) {
+      this.pauseModal.classList.remove('active');
+    }
 
     const mapConf = MAPS_CONFIG[this.selectedMap];
 
@@ -724,6 +761,21 @@ class Game {
         this.app.renderer.background.color = mapConf.bgTileColorLight;
       }
     }
+    if (this.gameEndTimeout) {
+      clearTimeout(this.gameEndTimeout);
+      this.gameEndTimeout = null;
+    }
+    this.gameEnding = false;
+
+    if (this.dartsProjectiles) {
+      for (const d of this.dartsProjectiles) {
+        if (d.graphics) {
+          this.app.stage.removeChild(d.graphics);
+          d.graphics.destroy();
+        }
+      }
+    }
+    this.dartsProjectiles = [];
 
     this.grid = JSON.parse(JSON.stringify(mapConf.layout));
     this.bubbles = [];
@@ -757,7 +809,8 @@ class Game {
       speed: config.speed,
       maxBubbles: config.maxBubbles,
       bubbleLength: config.maxLen,
-      needles: 1,
+      itemSlot: null, // Holds either 'needle' or 'dart'
+      hasPet: false,
       color: config.color,
       faceColor: config.faceColor,
       isCPU: false,
@@ -771,6 +824,33 @@ class Game {
     };
 
     this.characterContainer.addChild(this.player.graphics);
+
+    const playerStyle = new PIXI.TextStyle({
+      fontFamily: 'Outfit',
+      fontSize: 13,
+      fontWeight: 'bold',
+      fill: '#ffffff',
+      stroke: '#ff3333',
+      strokeThickness: 3.5,
+      align: 'center'
+    });
+    this.player.countdownText = new PIXI.Text('', playerStyle);
+    this.player.countdownText.anchor.set(0.5);
+    this.player.countdownText.visible = false;
+    this.characterContainer.addChild(this.player.countdownText);
+
+    // Make player trapped state click-to-rescue active
+    this.player.countdownText.interactive = true;
+    this.player.countdownText.cursor = 'pointer';
+    this.player.countdownText.on('pointerdown', () => {
+      this.useActiveItem();
+    });
+
+    this.player.graphics.interactive = true;
+    this.player.graphics.cursor = 'pointer';
+    this.player.graphics.on('pointerdown', () => {
+      this.useActiveItem();
+    });
 
     // Apply player HUD team styling
     const playerProfileEl = document.querySelector('.player-profile');
@@ -798,7 +878,8 @@ class Game {
         speed: cpuConfig.speed,
         maxBubbles: cpuConfig.maxBubbles + 1, // CPU gets a tiny buff for extra challenge
         bubbleLength: cpuConfig.maxLen,
-        needles: 2, // Smart CPU starts with needles for self-defense
+        itemSlot: null, // Holds either 'needle' or 'dart'
+        hasPet: false,
         color: cpuConfig.color,
         faceColor: cpuConfig.faceColor,
         isCPU: true,
@@ -816,6 +897,21 @@ class Game {
         team: this.cpuTeams[i] || 'blue' // Get configured team
       };
       this.characterContainer.addChild(cpu.graphics);
+
+      const cpuStyle = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: '#ffffff',
+        stroke: cpu.team === 'red' ? '#ff3333' : '#3333ff',
+        strokeThickness: 3.5,
+        align: 'center'
+      });
+      cpu.countdownText = new PIXI.Text('', cpuStyle);
+      cpu.countdownText.anchor.set(0.5);
+      cpu.countdownText.visible = false;
+      this.characterContainer.addChild(cpu.countdownText);
+
       this.cpus.push(cpu);
     }
 
@@ -835,6 +931,8 @@ class Game {
             <span class="hud-stat" id="hud-c-bubble-${cpu.id}">🎈 0/${cpu.maxBubbles}</span>
             <span class="hud-stat" id="hud-c-len-${cpu.id}">📏 ${cpu.bubbleLength}</span>
             <span class="hud-stat" id="hud-c-speed-${cpu.id}">⚡ ${cpu.speed.toFixed(1)}</span>
+            <span class="hud-stat" id="hud-c-item-${cpu.id}">🎒 無</span>
+            <span class="hud-stat" id="hud-c-pet-${cpu.id}">🐱 無</span>
           </div>
         </div>
         <div class="profile-avatar ${cpu.charKey}-color" id="cpu-hud-avatar-${cpu.id}"></div>
@@ -850,7 +948,7 @@ class Game {
 
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
-      if (!this.gameActive) return;
+      if (!this.gameActive || this.gameEnding) return;
       this.timeLeft--;
       this.updateTimerDisplay();
       if (this.timeLeft <= 0) {
@@ -873,11 +971,57 @@ class Game {
       document.getElementById('hud-p-bubble').textContent = `🎈 ${this.player.placedCount}/${this.player.maxBubbles}`;
       document.getElementById('hud-p-len').textContent = `📏 ${this.player.bubbleLength}`;
       document.getElementById('hud-p-speed').textContent = `⚡ ${this.player.speed.toFixed(1)}`;
-      document.getElementById('hud-p-needle').textContent = `📍 ${this.player.needles}`;
+      
+      const itemEl = document.getElementById('hud-p-item');
+      if (itemEl) {
+        let itemText = '🎒 無';
+        if (this.player.itemSlot === 'needle') itemText = '📍 針';
+        else if (this.player.itemSlot === 'dart') itemText = '🎯 飛針';
+        itemEl.textContent = itemText;
+      }
+      
+      const pPetEl = document.getElementById('hud-p-pet');
+      if (pPetEl) pPetEl.textContent = `🐱 ${this.player.hasPet ? '有' : '無'}`;
 
       const pAvatar = document.getElementById('player-hud-avatar');
       pAvatar.className = 'profile-avatar';
       pAvatar.classList.add(this.selectedChar === 'dao' ? 'dao-color' : (this.selectedChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+
+      const playerProfileEl = document.querySelector('.player-profile');
+      if (playerProfileEl) {
+        if (this.player.state === 'dead' || this.player.state === 'dying') {
+          playerProfileEl.classList.add('eliminated');
+        } else {
+          playerProfileEl.classList.remove('eliminated');
+        }
+      }
+
+      // Update mobile button text and status
+      const needleBtnEmoji = document.getElementById('btn-needle-emoji');
+      const needleBtnLabel = document.getElementById('btn-needle-label');
+      if (needleBtnEmoji && needleBtnLabel) {
+        if (this.player.itemSlot === 'needle') {
+          needleBtnEmoji.textContent = '📍';
+          needleBtnLabel.textContent = '自救針';
+        } else if (this.player.itemSlot === 'dart') {
+          needleBtnEmoji.textContent = '🎯';
+          needleBtnLabel.textContent = '飛針';
+        } else {
+          needleBtnEmoji.textContent = '🎒';
+          needleBtnLabel.textContent = '道具';
+        }
+      }
+
+      const needleBtn = document.getElementById('btn-needle');
+      if (needleBtn) {
+        const canUseNeedle = this.player.itemSlot === 'needle' && this.player.state === 'trapped';
+        const canUseDart = this.player.itemSlot === 'dart' && this.player.state === 'normal';
+        if (canUseNeedle || canUseDart) {
+          needleBtn.classList.add('can-use');
+        } else {
+          needleBtn.classList.remove('can-use');
+        }
+      }
     }
 
     if (this.cpus) {
@@ -885,14 +1029,23 @@ class Game {
         const bubbleEl = document.getElementById(`hud-c-bubble-${cpu.id}`);
         const lenEl = document.getElementById(`hud-c-len-${cpu.id}`);
         const speedEl = document.getElementById(`hud-c-speed-${cpu.id}`);
+        const itemEl = document.getElementById(`hud-c-item-${cpu.id}`);
+        const petEl = document.getElementById(`hud-c-pet-${cpu.id}`);
         const profileEl = document.getElementById(`cpu-profile-${cpu.id}`);
         
         if (bubbleEl) bubbleEl.textContent = `🎈 ${cpu.placedCount}/${cpu.maxBubbles}`;
         if (lenEl) lenEl.textContent = `📏 ${cpu.bubbleLength}`;
         if (speedEl) speedEl.textContent = `⚡ ${cpu.speed.toFixed(1)}`;
+        if (itemEl) {
+          let itemText = '🎒 無';
+          if (cpu.itemSlot === 'needle') itemText = '📍 針';
+          else if (cpu.itemSlot === 'dart') itemText = '🎯 飛針';
+          itemEl.textContent = itemText;
+        }
+        if (petEl) petEl.textContent = `🐱 ${cpu.hasPet ? '有' : '無'}`;
         
         if (profileEl) {
-          if (cpu.state === 'dead') {
+          if (cpu.state === 'dead' || cpu.state === 'dying') {
             profileEl.classList.add('eliminated');
           } else {
             profileEl.classList.remove('eliminated');
@@ -965,6 +1118,43 @@ class Game {
     this.mapContainer.addChild(mainG);
   }
 
+  useActiveItem() {
+    if (!this.gameActive || !this.player || this.gameEnding) return;
+    
+    if (this.player.itemSlot === 'needle') {
+      if (this.player.state === 'trapped') {
+        this.player.itemSlot = null;
+        this.player.state = 'normal';
+        sfx.playNeedle();
+        this.updateHUD();
+      }
+    } else if (this.player.itemSlot === 'dart') {
+      if (this.player.state === 'normal') {
+        this.player.itemSlot = null;
+        sfx.playNeedle(); // Play shot sound
+        this.updateHUD();
+
+        let dx = this.player.dirX;
+        let dy = this.player.dirY;
+        if (dx === 0 && dy === 0) {
+          dy = 1;
+        }
+
+        const dart = {
+          x: this.player.x,
+          y: this.player.y,
+          dirX: dx,
+          dirY: dy,
+          graphics: new PIXI.Graphics(),
+          owner: this.player,
+          speed: 360
+        };
+        this.app.stage.addChild(dart.graphics);
+        this.dartsProjectiles.push(dart);
+      }
+    }
+  }
+
   handleKeyDown(e) {
     if (e.code === 'Space') {
       e.preventDefault();
@@ -972,12 +1162,21 @@ class Game {
     
     this.keys[e.code] = true;
 
-    if (e.code === 'KeyN' && this.player.state === 'trapped') {
-      if (this.player.needles > 0) {
-        this.player.needles--;
-        this.player.state = 'normal';
-        sfx.playNeedle();
-        this.updateHUD();
+    if (e.code === 'KeyN') {
+      this.useActiveItem();
+    }
+
+    if (e.code === 'Escape') {
+      if (this.gameActive && !this.gameEnding) {
+        sfx.playClick();
+        this.gameActive = false;
+        if (this.pauseModal) {
+          this.pauseModal.classList.add('active');
+        }
+      } else if (!this.gameActive && this.pauseModal && this.pauseModal.classList.contains('active')) {
+        sfx.playClick();
+        this.gameActive = true;
+        this.pauseModal.classList.remove('active');
       }
     }
 
@@ -1149,11 +1348,11 @@ class Game {
     } else if (item.type === ITEM_TYPES.SPEED_UP) {
       char.speed = Math.min(5.0, char.speed + 0.3);
     } else if (item.type === ITEM_TYPES.NEEDLE) {
-      if (!char.isCPU) {
-        char.needles = Math.min(3, char.needles + 1);
-      } else {
-        char.needles = Math.min(3, char.needles + 1); // CPU can gather needles too
-      }
+      char.itemSlot = 'needle'; // overwrite current slot item
+    } else if (item.type === ITEM_TYPES.DART) {
+      char.itemSlot = 'dart'; // overwrite current slot item
+    } else if (item.type === ITEM_TYPES.PET) {
+      char.hasPet = true;
     }
     this.updateHUD();
   }
@@ -1196,11 +1395,22 @@ class Game {
     this.cratesDestroyedCount++;
     this.drawMap();
 
-    if (Math.random() < 0.3) {
-      const types = Object.values(ITEM_TYPES);
-      let chosenType = types[Math.floor(Math.random() * (types.length - 1))];
-      if (Math.random() < 0.1) {
+    if (Math.random() < 0.4) {
+      let chosenType;
+      const rand = Math.random();
+      if (rand < 0.55) {
+        // Standard stats
+        const standardTypes = [ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.SPEED_UP];
+        chosenType = standardTypes[Math.floor(Math.random() * standardTypes.length)];
+      } else if (rand < 0.75) {
+        // Needle
         chosenType = ITEM_TYPES.NEEDLE;
+      } else if (rand < 0.90) {
+        // Dart
+        chosenType = ITEM_TYPES.DART;
+      } else {
+        // Pet
+        chosenType = ITEM_TYPES.PET;
       }
 
       const item = {
@@ -1237,6 +1447,8 @@ class Game {
     if (item.type === ITEM_TYPES.LENGTH_UP) color = 0xffe66d;
     if (item.type === ITEM_TYPES.SPEED_UP) color = 0x00ffaa;
     if (item.type === ITEM_TYPES.NEEDLE) color = 0xffffff;
+    if (item.type === ITEM_TYPES.DART) color = 0xffa500; // Orange
+    if (item.type === ITEM_TYPES.PET) color = 0xff66cc; // Pink
 
     g.beginFill(color);
     g.drawCircle(x, y - 2, 8 * scale);
@@ -1249,6 +1461,34 @@ class Game {
     } else if (item.type === ITEM_TYPES.SPEED_UP) {
       g.beginFill(0x000000);
       g.drawPolygon([x - 3, y - 2, x + 2, y - 5, x, y + 2, x + 3, y + 2, x - 2, y + 7, x - 1, y]);
+      g.endFill();
+    } else if (item.type === ITEM_TYPES.NEEDLE) {
+      // Draw syringe needle shape
+      g.lineStyle(1.5, 0x333333, 1);
+      g.moveTo(x - 3, y + 3);
+      g.lineTo(x + 3, y - 3);
+      g.moveTo(x + 1, y - 1);
+      g.lineTo(x + 4, y - 4);
+      g.lineStyle(0);
+    } else if (item.type === ITEM_TYPES.DART) {
+      // Draw dart feathers and shaft
+      g.beginFill(0xffffff);
+      g.drawPolygon([x - 3, y + 3, x - 5, y + 5, x - 2, y + 5]);
+      g.drawPolygon([x + 3, y + 3, x + 5, y + 5, x + 2, y + 5]);
+      g.endFill();
+      g.lineStyle(1.5, 0xff0000);
+      g.moveTo(x, y + 4);
+      g.lineTo(x, y - 5);
+      g.lineStyle(0);
+    } else if (item.type === ITEM_TYPES.PET) {
+      // Draw cute pet face shape (ears)
+      g.beginFill(color);
+      g.drawCircle(x - 4, y - 7, 2.5);
+      g.drawCircle(x + 4, y - 7, 2.5);
+      g.endFill();
+      g.beginFill(0xffffff);
+      g.drawCircle(x - 4, y - 7, 1.0);
+      g.drawCircle(x + 4, y - 7, 1.0);
       g.endFill();
     }
   }
@@ -1346,14 +1586,44 @@ class Game {
 
   updateCPUAI(cpu, dt) {
     if (cpu.state !== 'normal') {
-      // CPU rescue logic: If CPU is trapped, and has needles, use one after 0.6 seconds!
-      if (cpu.state === 'trapped' && cpu.needles > 0 && cpu.trapTimer < 4.4) {
-        cpu.needles--;
+      // CPU rescue logic: If CPU is trapped, and has needles in itemSlot, use one after 0.6 seconds!
+      if (cpu.state === 'trapped' && cpu.itemSlot === 'needle' && cpu.trapTimer < 4.4) {
+        cpu.itemSlot = null;
         cpu.state = 'normal';
         sfx.playNeedle();
         this.updateHUD();
       }
       return;
+    }
+
+    // CPU AI Dart usage: if CPU has a dart in itemSlot, and there's a bubble in front of it in its moving direction, it throws it
+    if (cpu.itemSlot === 'dart' && Math.random() < 0.03) {
+      let dx = cpu.dirX;
+      let dy = cpu.dirY;
+      if (dx !== 0 || dy !== 0) {
+        const frontCol = Math.floor(cpu.x / TILE_SIZE) + dx;
+        const frontRow = Math.floor(cpu.y / TILE_SIZE) + dy;
+        if (frontCol >= 0 && frontCol < GRID_COLS && frontRow >= 0 && frontRow < GRID_ROWS) {
+          const hasBubble = this.bubbles.some(b => b.col === frontCol && b.row === frontRow);
+          if (hasBubble) {
+            cpu.itemSlot = null;
+            sfx.playNeedle();
+            this.updateHUD();
+
+            const dart = {
+              x: cpu.x,
+              y: cpu.y,
+              dirX: dx,
+              dirY: dy,
+              graphics: new PIXI.Graphics(),
+              owner: cpu,
+              speed: 360
+            };
+            this.app.stage.addChild(dart.graphics);
+            this.dartsProjectiles.push(dart);
+          }
+        }
+      }
     }
 
     if (cpu.placeCooldown > 0) {
@@ -1654,19 +1924,21 @@ class Game {
     let playerDx = 0;
     let playerDy = 0;
     
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) playerDy = -this.player.speed;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) playerDy = this.player.speed;
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) playerDx = -this.player.speed;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) playerDx = this.player.speed;
+    if (!this.gameEnding) {
+      if (this.keys['KeyW'] || this.keys['ArrowUp']) playerDy = -this.player.speed;
+      if (this.keys['KeyS'] || this.keys['ArrowDown']) playerDy = this.player.speed;
+      if (this.keys['KeyA'] || this.keys['ArrowLeft']) playerDx = -this.player.speed;
+      if (this.keys['KeyD'] || this.keys['ArrowRight']) playerDx = this.player.speed;
 
-    if (playerDx !== 0 && playerDy !== 0) {
-      playerDx *= 0.7071;
-      playerDy *= 0.7071;
+      if (playerDx !== 0 && playerDy !== 0) {
+        playerDx *= 0.7071;
+        playerDy *= 0.7071;
+      }
     }
 
     this.moveCharacter(this.player, playerDx, playerDy);
 
-    if (this.cpus) {
+    if (this.cpus && !this.gameEnding) {
       for (const cpu of this.cpus) {
         this.updateCPUAI(cpu, dt);
       }
@@ -1723,6 +1995,53 @@ class Game {
       this.drawItem(it);
     }
 
+    // Update Darts Projectiles
+    if (this.dartsProjectiles) {
+      for (let i = this.dartsProjectiles.length - 1; i >= 0; i--) {
+        const d = this.dartsProjectiles[i];
+        d.x += d.dirX * d.speed * dt;
+        d.y += d.dirY * d.speed * dt;
+
+        d.graphics.clear();
+        d.graphics.lineStyle(3, 0xffa500, 1);
+        
+        // Draw dart pointing in direction
+        d.graphics.moveTo(d.x, d.y);
+        d.graphics.lineTo(d.x - d.dirX * 12, d.y - d.dirY * 12);
+        
+        // Draw tip
+        d.graphics.beginFill(0xffaa00);
+        d.graphics.drawCircle(d.x, d.y, 3.5);
+        d.graphics.endFill();
+        d.graphics.lineStyle(0);
+
+        const dCol = Math.floor(d.x / TILE_SIZE);
+        const dRow = Math.floor(d.y / TILE_SIZE);
+
+        let hit = false;
+        if (dCol < 0 || dCol >= GRID_COLS || dRow < 0 || dRow >= GRID_ROWS) {
+          hit = true;
+        } else if (this.grid[dRow][dCol] === 1 || this.grid[dRow][dCol] === 2) {
+          hit = true;
+        } else {
+          const bubbleIndex = this.bubbles.findIndex(b => b.col === dCol && b.row === dRow);
+          if (bubbleIndex !== -1) {
+            const b = this.bubbles[bubbleIndex];
+            this.explodeBubble(b);
+            this.bubbleContainer.removeChild(b.graphics);
+            this.bubbles.splice(bubbleIndex, 1);
+            hit = true;
+          }
+        }
+
+        if (hit) {
+          this.app.stage.removeChild(d.graphics);
+          d.graphics.destroy();
+          this.dartsProjectiles.splice(i, 1);
+        }
+      }
+    }
+
     this.drawCharacter(this.player);
     if (this.cpus) {
       for (const cpu of this.cpus) {
@@ -1734,11 +2053,24 @@ class Game {
   }
 
   updateCharacterStates(char, dt) {
+    if (char.invincibilityTimer && char.invincibilityTimer > 0) {
+      char.invincibilityTimer -= dt;
+    }
+
     if (char.state === 'trapped') {
       char.trapTimer -= dt;
       if (char.trapTimer <= 0) {
-        char.state = 'dead';
+        char.state = 'dying';
+        char.dyingTimer = 1.5;
         sfx.playPopTrap();
+        this.updateHUD();
+      }
+    } else if (char.state === 'dying') {
+      char.dyingTimer -= dt;
+      char.y -= dt * 30; // Float up
+      if (char.dyingTimer <= 0) {
+        char.state = 'dead';
+        this.updateHUD();
       }
     }
   }
@@ -1782,22 +2114,44 @@ class Game {
 
   checkFlameCollision(flame) {
     const characters = [this.player, ...this.cpus];
+    let stateChanged = false;
     for (const char of characters) {
-      if (char.state === 'dead') continue;
+      if (char.state === 'dead' || char.state === 'dying') continue;
 
       const charCol = Math.floor(char.x / TILE_SIZE);
       const charRow = Math.floor(char.y / TILE_SIZE);
 
       if (charCol === flame.col && charRow === flame.row) {
         if (char.state === 'normal') {
-          char.state = 'trapped';
-          char.trapTimer = 5.0;
-          sfx.playBubbleTrap();
+          if (char.invincibilityTimer && char.invincibilityTimer > 0) {
+            continue;
+          }
+          if (char.hasPet) {
+            char.hasPet = false;
+            char.invincibilityTimer = 1.5;
+            sfx.playNeedle(); // play shield sound
+            this.showFloatingText(char.x, char.y - 20, "PET SHIELD!", 0xff66cc);
+            stateChanged = true;
+          } else {
+            char.state = 'trapped';
+            char.trapTimer = 5.0;
+            char.trappedTime = Date.now(); // Record when they got trapped to prevent instant popping by same/overlapping flames
+            sfx.playBubbleTrap();
+            stateChanged = true;
+          }
         } else if (char.state === 'trapped') {
-          char.state = 'dead';
-          sfx.playPopTrap();
+          // Add a 0.5-second invulnerability window upon being trapped, so overlapping or simultaneous flames don't cause instant pop
+          if (!char.trappedTime || (Date.now() - char.trappedTime > 500)) {
+            char.state = 'dying';
+            char.dyingTimer = 1.5;
+            sfx.playPopTrap();
+            stateChanged = true;
+          }
         }
       }
+    }
+    if (stateChanged) {
+      this.updateHUD();
     }
   }
 
@@ -1805,7 +2159,71 @@ class Game {
     const g = char.graphics;
     g.clear();
 
-    if (char.state === 'dead') return;
+    // Blinking effect when invincible
+    g.alpha = (char.invincibilityTimer > 0 && Math.floor(Date.now() / 100) % 2 === 0) ? 0.35 : 1.0;
+
+    if (char.state === 'dead') {
+      if (char.countdownText) {
+        char.countdownText.visible = false;
+      }
+      return;
+    }
+
+    if (char.hasPet && char.state === 'normal') {
+      const petX = char.x - (char.dirX || 1) * 16;
+      const petY = char.y - 18 + Math.sin(Date.now() * 0.005) * 3;
+      g.beginFill(0xff66cc);
+      g.drawCircle(petX, petY, char.radius * 0.45);
+      g.endFill();
+      // ears
+      g.beginFill(0xff66cc);
+      g.drawCircle(petX - 4, petY - 5, 2.0);
+      g.drawCircle(petX + 4, petY - 5, 2.0);
+      g.endFill();
+      // eyes
+      g.beginFill(0xffffff);
+      g.drawCircle(petX - 2, petY - 1, 1.0);
+      g.drawCircle(petX + 2, petY - 1, 1.0);
+      g.endFill();
+    }
+
+    if (char.state === 'dying') {
+      const pulse = 1.0 + 0.1 * Math.sin(Date.now() * 0.015);
+      const alpha = Math.max(0, char.dyingTimer / 1.5);
+      
+      // Draw a cute ghost (like classic Crazy Arcade)
+      g.beginFill(0xffffff, alpha * 0.75);
+      
+      // Ghost head
+      g.drawCircle(char.x, char.y, char.radius * pulse);
+      
+      // Ghost body/skirt
+      const tailY = char.y + char.radius * 0.7;
+      g.drawRect(char.x - char.radius, char.y, char.radius * 2, char.radius * 0.7);
+      
+      // Skirt waves at bottom
+      g.drawCircle(char.x - char.radius * 0.6, tailY, char.radius * 0.35);
+      g.drawCircle(char.x, tailY, char.radius * 0.35);
+      g.drawCircle(char.x + char.radius * 0.6, tailY, char.radius * 0.35);
+      g.endFill();
+
+      // Ghost eyes
+      g.beginFill(0x555555, alpha * 0.85);
+      g.drawCircle(char.x - 4, char.y - 1, 2.5);
+      g.drawCircle(char.x + 4, char.y - 1, 2.5);
+      g.endFill();
+
+      // Ghost cute cheeks
+      g.beginFill(0xffb3b3, alpha * 0.6);
+      g.drawCircle(char.x - 7, char.y + 3, 2);
+      g.drawCircle(char.x + 7, char.y + 3, 2);
+      g.endFill();
+
+      if (char.countdownText) {
+        char.countdownText.visible = false;
+      }
+      return;
+    }
 
     if (char.state === 'trapped') {
       const pulse = 1.05 + 0.05 * Math.sin(Date.now() * 0.01);
@@ -1841,7 +2259,34 @@ class Game {
       g.lineTo(char.x, char.y - char.radius * 1.3 - 16);
       g.endFill();
 
+      // Draw countdown text & prompt above bubble
+      if (char.countdownText) {
+        char.countdownText.visible = true;
+        char.countdownText.x = char.x;
+        char.countdownText.y = char.y - char.radius * 1.3 - 42;
+        const secondsLeft = Math.max(0, Math.ceil(char.trapTimer));
+        
+        let text = `${secondsLeft}s`;
+        if (char.itemSlot === 'needle') {
+          if (!char.isCPU) {
+            const selfRescuePrompt = document.body.classList.contains('is-mobile') ? "📍 點 [自救]/畫面自救" : "📍 按 [N]/點擊自救";
+            text += `\n${selfRescuePrompt}`;
+          } else {
+            text += `\n📍 自救中...`;
+          }
+        } else {
+          if (!char.isCPU) {
+            text += `\n❌ 無針自救`;
+          }
+        }
+        char.countdownText.text = text;
+      }
+
       return;
+    }
+
+    if (char.countdownText) {
+      char.countdownText.visible = false;
     }
 
     g.beginFill(0x000000, 0.25);
@@ -1932,31 +2377,66 @@ class Game {
             this.updateHUD();
           } else {
             // Enemy kill!
-            charB.state = 'dead';
-            sfx.playPopTrap();
-            this.showFloatingText(charB.x, charB.y - 20, "OUT!", 0xff8080);
-            this.updateHUD();
+            // Add a 0.5-second invulnerability window upon being trapped, so enemies standing right on the player don't instantly kill them
+            if (!charB.trappedTime || (Date.now() - charB.trappedTime > 500)) {
+              charB.state = 'dying';
+              charB.dyingTimer = 1.5;
+              sfx.playPopTrap();
+              this.showFloatingText(charB.x, charB.y - 20, "OUT!", 0xff8080);
+              this.updateHUD();
+            }
           }
         }
       }
     }
 
     // 2. Check winning/losing condition based on team survival
-    const redTeamAlive = chars.some(c => c.team === 'red' && c.state !== 'dead');
-    const blueTeamAlive = chars.some(c => c.team === 'blue' && c.state !== 'dead');
+    const redTeamAlive = chars.some(c => c.team === 'red' && c.state !== 'dead' && c.state !== 'dying');
+    const blueTeamAlive = chars.some(c => c.team === 'blue' && c.state !== 'dead' && c.state !== 'dying');
 
     if (!redTeamAlive && !blueTeamAlive) {
-      this.endGame('draw', 'both_teams_dead');
+      if (!this.gameEnding) {
+        this.gameEnding = true;
+        this.gameEndTimeout = setTimeout(() => {
+          this.endGame('draw', 'both_teams_dead');
+        }, 1500);
+      }
     } else if (!redTeamAlive) {
-      this.endGame('lose', 'red_team_dead');
+      if (!this.gameEnding) {
+        this.gameEnding = true;
+        this.gameEndTimeout = setTimeout(() => {
+          this.endGame('lose', 'red_team_dead');
+        }, 1500);
+      }
     } else if (!blueTeamAlive) {
-      this.endGame('win', 'blue_team_dead');
+      if (!this.gameEnding) {
+        this.gameEnding = true;
+        this.gameEndTimeout = setTimeout(() => {
+          this.endGame('win', 'blue_team_dead');
+        }, 1500);
+      }
     }
   }
 
   endGame(outcome, reason) {
     if (!this.gameActive && reason !== 'abort') return;
     this.gameActive = false;
+
+    if (this.gameEndTimeout) {
+      clearTimeout(this.gameEndTimeout);
+      this.gameEndTimeout = null;
+    }
+    this.gameEnding = false;
+
+    if (this.dartsProjectiles) {
+      for (const d of this.dartsProjectiles) {
+        if (d.graphics) {
+          this.app.stage.removeChild(d.graphics);
+          d.graphics.destroy();
+        }
+      }
+    }
+    this.dartsProjectiles = [];
 
     if (this.timerInterval) {
       clearInterval(this.timerInterval);

@@ -95,7 +95,7 @@
           <div class="controls-guide">
             <div class="control-item"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> <span>/</span> <span class="key">↑</span><span class="key">↓</span><span class="key">←</span><span class="key">→</span> <span>移動角色</span></div>
             <div class="control-item"><span class="key space">Space</span> <span>放置水泡</span></div>
-            <div class="control-item"><span class="key">N</span> <span>使用針 (若被困住)</span></div>
+            <div class="control-item"><span class="key">N</span> <span>使用道具 (自救針/飛針)</span></div>
           </div>
         </div>
       </div>
@@ -113,13 +113,17 @@
                 <span class="hud-stat" id="hud-p-bubble">🎈 1/1</span>
                 <span class="hud-stat" id="hud-p-len">📏 2</span>
                 <span class="hud-stat" id="hud-p-speed">⚡ 2.5</span>
-                <span class="hud-stat" id="hud-p-needle">📍 1</span>
+                <span class="hud-stat" id="hud-p-item">🎒 無</span>
+                <span class="hud-stat" id="hud-p-pet">🐱 無</span>
               </div>
             </div>
           </div>
         </div>
         
-        <div class="game-timer" id="timer-display">03:00</div>
+        <div class="timer-container">
+          <div class="game-timer" id="timer-display">03:00</div>
+          <button id="menu-btn" class="menu-btn">⚙️</button>
+        </div>
 
         <div class="player-info-container cpu-info" id="cpu-hud-container">
           <!-- Dynamic CPU profiles will be inserted here -->
@@ -134,11 +138,6 @@
       <div id="mobile-controller" class="mobile-controls-container">
         <!-- Control Mode Toggle & Joystick Area -->
         <div class="joystick-wrapper-container">
-          <button id="control-mode-toggle" class="control-toggle-btn">
-            <span class="toggle-icon">🎮</span>
-            <span class="toggle-text">搖桿模式</span>
-          </button>
-          
           <div class="joystick-wrapper joystick-mode" id="joystick-wrapper">
             <!-- Joystick View -->
             <div class="joystick-base">
@@ -178,8 +177,8 @@
 
         <div class="action-container">
           <button id="btn-needle" class="mobile-btn action-btn needle" data-key="KeyN">
-            <span class="btn-emoji">📍</span>
-            <span class="btn-label">針</span>
+            <span class="btn-emoji" id="btn-needle-emoji">🎒</span>
+            <span class="btn-label" id="btn-needle-label">道具</span>
           </button>
           <button id="btn-bomb" class="mobile-btn action-btn bomb" data-key="Space">
             <span class="btn-emoji">🎈</span>
@@ -188,10 +187,6 @@
         </div>
       </div>
 
-      <div class="hud-footer">
-        <button id="exit-btn" class="btn secondary">返回大廳</button>
-        <button id="restart-btn" class="btn secondary">重新開始</button>
-      </div>
     </div>
 
     <!-- Game Over / Win Overlay -->
@@ -206,6 +201,23 @@
         <div class="actions">
           <button id="play-again-btn" class="btn primary">再玩一次</button>
           <button id="result-exit-btn" class="btn secondary">回到大廳</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause / Menu Modal -->
+    <div id="pause-modal" class="overlay">
+      <div class="glass-panel modal-panel">
+        <h2 class="modal-title">遊戲選單</h2>
+        <p class="modal-desc">遊戲已暫停，請選擇您的操作：</p>
+        <div class="modal-actions">
+          <button id="modal-resume-btn" class="btn primary">繼續遊戲</button>
+          <button id="control-mode-toggle" class="btn secondary mobile-only-btn">
+            <span class="toggle-icon">🎮</span>
+            <span class="toggle-text">搖桿模式</span>
+          </button>
+          <button id="modal-restart-btn" class="btn secondary">重新開始</button>
+          <button id="modal-exit-btn" class="btn secondary">返回大廳</button>
         </div>
       </div>
     </div>
