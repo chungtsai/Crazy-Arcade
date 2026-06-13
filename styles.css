@@ -72,14 +72,16 @@ body {
   z-index: 10;
 }
 
-/* Lobby screen scaling and scrolling on PC/desktop */
+/* Lobby screen scaling - restore scrolling for PC, hide scrollbar */
 #lobby-screen {
   width: 100%;
   height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 2.5rem 1rem;
+  scrollbar-width: none; /* Firefox */
 }
+#lobby-screen::-webkit-scrollbar { display: none; }
 
 /* Custom Scrollbar for Lobby */
 #lobby-screen::-webkit-scrollbar {

@@ -654,7 +654,11 @@ class Game {
         if (currentRow && currentRow.length > 0) {
           this.lobbyColIdx = Math.max(0, Math.min(this.lobbyColIdx, currentRow.length - 1));
           const target = currentRow[this.lobbyColIdx];
-          if (target) target.classList.add('gamepad-focused');
+          if (target) {
+            target.classList.add('gamepad-focused');
+            // Ensure the focused element is visible within the scrollable lobby screen
+            target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          }
         }
       }
     }
