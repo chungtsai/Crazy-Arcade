@@ -1644,7 +1644,10 @@ class Game {
       
       const pPetEl = document.getElementById('hud-p-pet');
       if (pPetEl) {
-        pPetEl.textContent = '🐱';
+        let petText = '🐱';
+        if (redPlayer.hasPet === 'fast_turtle') petText = '🐢💨';
+        else if (redPlayer.hasPet === 'slow_turtle') petText = '🐢💤';
+        pPetEl.textContent = petText;
         pPetEl.classList.toggle('has-pet', !!redPlayer.hasPet);
       }
 
@@ -1696,7 +1699,10 @@ class Game {
       
       const pPetEl = document.getElementById('hud-p2-pet');
       if (pPetEl) {
-        pPetEl.textContent = '🐱';
+        let petText = '🐱';
+        if (bluePlayer.hasPet === 'fast_turtle') petText = '🐢💨';
+        else if (bluePlayer.hasPet === 'slow_turtle') petText = '🐢💤';
+        pPetEl.textContent = petText;
         pPetEl.classList.toggle('has-pet', !!bluePlayer.hasPet);
       }
 
@@ -1911,6 +1917,7 @@ class Game {
     if (e.code === 'KeyN' || e.code === 'KeyF' || e.code === 'KeyE') {
       this.useActiveItem(this.player);
     }
+
 
     // Player 2 use item (disabled in net mode as player2 is remote)
     if (this.is2PMode && this.player2 && !this.isNetMode && (e.code === 'KeyM' || e.code === 'Period' || e.code === 'ShiftRight' || e.code === 'KeyL')) {
@@ -2130,6 +2137,32 @@ class Game {
     }
   }
 
+  mountPet(char, petType) {
+    if (char.hasPet) {
+      this.dismountPet(char);
+    }
+    char.speedBeforePet = char.speed;
+    char.hasPet = petType;
+    if (petType === 'fast_turtle') {
+      char.speed = 4.5;
+    } else if (petType === 'slow_turtle') {
+      char.speed = 1.2;
+    } else {
+      // Cat: speed remains unchanged
+      char.speed = char.speedBeforePet;
+    }
+  }
+
+  dismountPet(char) {
+    if (char.hasPet) {
+      char.hasPet = false;
+      if (char.speedBeforePet !== undefined) {
+        char.speed = char.speedBeforePet;
+        delete char.speedBeforePet;
+      }
+    }
+  }
+
   collectItem(char, item) {
     sfx.playItemCollect();
     if (item.type === ITEM_TYPES.BUBBLE_UP) {
@@ -2137,13 +2170,21 @@ class Game {
     } else if (item.type === ITEM_TYPES.LENGTH_UP) {
       char.bubbleLength = Math.min(6, char.bubbleLength + 1);
     } else if (item.type === ITEM_TYPES.SPEED_UP) {
-      char.speed = Math.min(5.0, char.speed + 0.3);
+      if (char.speedBeforePet !== undefined) {
+        char.speedBeforePet = Math.min(5.0, char.speedBeforePet + 0.3);
+      } else {
+        char.speed = Math.min(5.0, char.speed + 0.3);
+      }
     } else if (item.type === ITEM_TYPES.NEEDLE) {
       char.itemSlot = 'needle'; // overwrite current slot item
     } else if (item.type === ITEM_TYPES.DART) {
       char.itemSlot = 'dart'; // overwrite current slot item
     } else if (item.type === ITEM_TYPES.PET) {
-      char.hasPet = true;
+      this.mountPet(char, 'cat');
+    } else if (item.type === ITEM_TYPES.PET_FAST_TURTLE) {
+      this.mountPet(char, 'fast_turtle');
+    } else if (item.type === ITEM_TYPES.PET_SLOW_TURTLE) {
+      this.mountPet(char, 'slow_turtle');
     }
     this.updateHUD();
   }
@@ -2222,7 +2263,8 @@ class Game {
         } else if (rand < 0.90) {
           chosenType = ITEM_TYPES.DART;
         } else {
-          chosenType = ITEM_TYPES.PET;
+          const petPool = [ITEM_TYPES.PET, ITEM_TYPES.PET_FAST_TURTLE, ITEM_TYPES.PET_SLOW_TURTLE];
+          chosenType = petPool[Math.floor(Math.random() * petPool.length)];
         }
       }
     }
@@ -2280,6 +2322,8 @@ class Game {
       else if (item.type === ITEM_TYPES.NEEDLE) emoji = '📍';
       else if (item.type === ITEM_TYPES.DART) emoji = '🎯';
       else if (item.type === ITEM_TYPES.PET) emoji = '🐱';
+      else if (item.type === ITEM_TYPES.PET_FAST_TURTLE) emoji = '🐢💨';
+      else if (item.type === ITEM_TYPES.PET_SLOW_TURTLE) emoji = '🐢💤';
 
       const style = new PIXI.TextStyle({
         fontSize: 22,
@@ -3064,7 +3108,7 @@ class Game {
             continue;
           }
           if (char.hasPet) {
-            char.hasPet = false;
+            this.dismountPet(char);
             char.invincibilityTimer = 1.5;
             sfx.playNeedle(); // play shield sound
             this.showFloatingText(char.x, char.y - 20, "PET SHIELD!", 0xff66cc);
@@ -3109,22 +3153,239 @@ class Game {
       return;
     }
 
+    let drawX = char.x;
+    let drawY = char.y;
+
+    const isMoving = char.lastX !== undefined && (Math.abs(char.x - char.lastX) > 0.1 || Math.abs(char.y - char.lastY) > 0.1);
+    char.lastX = char.x;
+    char.lastY = char.y;
+
+    let bob = 0;
     if (char.hasPet && char.state === 'normal') {
-      const petX = char.x - (char.dirX || 1) * 16;
-      const petY = char.y - 18 + Math.sin(Date.now() * 0.005) * 3;
-      g.beginFill(0xff66cc);
-      g.drawCircle(petX, petY, char.radius * 0.45);
-      g.endFill();
-      // ears
-      g.beginFill(0xff66cc);
-      g.drawCircle(petX - 4, petY - 5, 2.0);
-      g.drawCircle(petX + 4, petY - 5, 2.0);
-      g.endFill();
-      // eyes
-      g.beginFill(0xffffff);
-      g.drawCircle(petX - 2, petY - 1, 1.0);
-      g.drawCircle(petX + 2, petY - 1, 1.0);
-      g.endFill();
+      const animSpeed = isMoving ? 0.015 : 0.006;
+      const bobAmt = isMoving ? 2.5 : 1.0;
+      bob = Math.sin(Date.now() * animSpeed) * bobAmt;
+      drawY = char.y - 12 + bob;
+
+      const petX = char.x;
+      const petY = char.y + 6 + bob * 0.5;
+      const petR = char.radius * 1.1;
+
+      if (char.hasPet === 'fast_turtle' || char.hasPet === 'slow_turtle') {
+        const isFast = char.hasPet === 'fast_turtle';
+
+        // 1. Draw Tail (behind shell)
+        const tailSwing = Math.sin(Date.now() * (isMoving ? 0.015 : 0.006) * 1.5) * 3;
+        const tailDir = char.dirX !== 0 ? -char.dirX : -1;
+        const tailX = petX + tailDir * (petR * 0.85);
+        const tailY = petY + petR * 0.2;
+
+        g.beginFill(isFast ? 0x2eb82e : 0x70a370);
+        g.drawCircle(tailX, tailY + tailSwing * 0.5, petR * 0.2);
+        g.endFill();
+
+        // 2. Draw Flippers/Feet (walking animation)
+        const walkCycle = isMoving ? Math.sin(Date.now() * 0.02) * 4 : 0;
+        const pawY = petY + petR * 0.65;
+        g.beginFill(isFast ? 0x5cd65c : 0x8cc68c);
+        // Back foot
+        g.drawCircle(petX - 8 + walkCycle, pawY, 5);
+        // Front foot
+        g.drawCircle(petX + 8 - walkCycle, pawY, 5);
+        g.endFill();
+
+        // 3. Draw Head (protrudes in direction of movement)
+        const headDir = char.dirX !== 0 ? char.dirX : 1;
+        const headX = petX + headDir * (petR * 0.75);
+        const headY = petY - petR * 0.1;
+
+        g.beginFill(isFast ? 0x5cd65c : 0x8cc68c);
+        g.drawCircle(headX, headY, petR * 0.45);
+        g.endFill();
+
+        if (isFast) {
+          // Fast Turtle Headband (Red)
+          g.beginFill(0xff3333);
+          g.drawRect(headX - petR * 0.45, headY - petR * 0.25, petR * 0.9, petR * 0.18);
+          g.endFill();
+
+          // Headband tie knot
+          const knotX = headX - headDir * (petR * 0.4);
+          g.beginFill(0xff3333);
+          g.moveTo(knotX, headY);
+          g.lineTo(knotX - headDir * 6, headY + 3);
+          g.lineTo(knotX - headDir * 4, headY + 6);
+          g.endFill();
+        }
+
+        // Eyes
+        const eyeOffset = headDir * 1.5;
+        if (isFast) {
+          g.beginFill(0x222222);
+          g.drawCircle(headX + eyeOffset + headDir * 1, headY - 1, 2.5);
+          g.endFill();
+          g.beginFill(0xffffff);
+          g.drawCircle(headX + eyeOffset + headDir * 1.5, headY - 1.5, 1);
+          g.endFill();
+        } else {
+          g.lineStyle(1.8, 0x555555);
+          g.moveTo(headX - 3 + eyeOffset, headY);
+          g.quadraticCurveTo(headX + eyeOffset, headY + 2, headX + 3 + eyeOffset, headY);
+          g.lineStyle(0);
+
+          // Zzz
+          if (Math.floor(Date.now() / 800) % 2 === 0) {
+            g.lineStyle(1.2, 0xffffff, 0.8);
+            const zX = headX + headDir * 6;
+            const zY = headY - 12;
+            g.moveTo(zX - 3, zY - 3);
+            g.lineTo(zX + 3, zY - 3);
+            g.lineTo(zX - 3, zY + 3);
+            g.lineTo(zX + 3, zY + 3);
+            g.lineStyle(0);
+          }
+        }
+
+        // 4. Draw Shell
+        const shellColor = isFast ? 0xff5533 : 0x4d88ff;
+        const plateColor = isFast ? 0xffcc00 : 0x2b59c3;
+
+        g.beginFill(shellColor);
+        g.drawCircle(petX, petY, petR);
+        g.endFill();
+
+        g.lineStyle(1.5, plateColor, 0.8);
+        g.beginFill(shellColor);
+        g.drawCircle(petX, petY, petR * 0.5);
+        g.endFill();
+
+        g.moveTo(petX, petY - petR * 0.5);
+        g.lineTo(petX, petY - petR);
+        g.moveTo(petX, petY + petR * 0.5);
+        g.lineTo(petX, petY + petR);
+        g.moveTo(petX - petR * 0.5, petY);
+        g.lineTo(petX - petR, petY);
+        g.moveTo(petX + petR * 0.5, petY);
+        g.lineTo(petX + petR, petY);
+        g.lineStyle(0);
+
+        g.lineStyle(2, plateColor);
+        g.drawCircle(petX, petY, petR);
+        g.lineStyle(0);
+
+      } else {
+        // Draw Cat
+        // 1. Draw Tail (behind body)
+        const tailSwing = Math.sin(Date.now() * (isMoving ? 0.015 : 0.006) * 1.5) * 4;
+        const tailDir = char.dirX !== 0 ? -char.dirX : -1;
+        const tailX = petX + tailDir * (petR * 0.85);
+        const tailY = petY + 2;
+
+        g.beginFill(0xff409f); // Darker pink tail tip
+        g.drawCircle(tailX + tailDir * 4, tailY - 5 + tailSwing, petR * 0.25);
+        g.endFill();
+
+        g.beginFill(0xff73b9); // Main tail body
+        g.drawCircle(tailX, tailY + tailSwing * 0.5, petR * 0.35);
+        g.endFill();
+
+        // 2. Draw Paws
+        const walkCycle = isMoving ? Math.sin(Date.now() * 0.02) * 4 : 0;
+        const pawY = petY + petR * 0.75;
+        // Left front paw
+        g.beginFill(0xffffff);
+        g.drawCircle(petX - 8 + walkCycle, pawY, 4.5);
+        // Right front paw
+        g.drawCircle(petX + 8 - walkCycle, pawY, 4.5);
+        g.endFill();
+
+        // Paw pads (little pink dots!)
+        g.beginFill(0xffb3d9);
+        g.drawCircle(petX - 8 + walkCycle, pawY + 1, 2);
+        g.drawCircle(petX + 8 - walkCycle, pawY + 1, 2);
+        g.endFill();
+
+        // 3. Draw Ears
+        // Left ear
+        g.beginFill(0xff73b9);
+        g.moveTo(petX - petR * 0.85, petY - petR * 0.3);
+        g.lineTo(petX - petR * 0.4, petY - petR * 0.95);
+        g.lineTo(petX - petR * 0.15, petY - petR * 0.2);
+        g.endFill();
+        // Left inner ear
+        g.beginFill(0xffb3d9);
+        g.moveTo(petX - petR * 0.75, petY - petR * 0.35);
+        g.lineTo(petX - petR * 0.45, petY - petR * 0.85);
+        g.lineTo(petX - petR * 0.25, petY - petR * 0.3);
+        g.endFill();
+
+        // Right ear
+        g.beginFill(0xff73b9);
+        g.moveTo(petX + petR * 0.85, petY - petR * 0.3);
+        g.lineTo(petX + petR * 0.4, petY - petR * 0.95);
+        g.lineTo(petX + petR * 0.15, petY - petR * 0.2);
+        g.endFill();
+        // Right inner ear
+        g.beginFill(0xffb3d9);
+        g.moveTo(petX + petR * 0.75, petY - petR * 0.35);
+        g.lineTo(petX + petR * 0.45, petY - petR * 0.85);
+        g.lineTo(petX + petR * 0.25, petY - petR * 0.3);
+        g.endFill();
+
+        // 4. Draw Main Body (head/body combined)
+        g.beginFill(0xff73b9);
+        g.drawCircle(petX, petY, petR);
+        g.endFill();
+
+        // 5. Draw Face details (cheeks, eyes, nose, mouth)
+        // Cheeks
+        g.beginFill(0xff99cc, 0.75);
+        g.drawCircle(petX - petR * 0.5, petY + 2, 4);
+        g.drawCircle(petX + petR * 0.5, petY + 2, 4);
+        g.endFill();
+
+        // Eye offset depending on where player looks
+        const faceOffset = char.dirX * 3.5;
+
+        // Eyes
+        g.beginFill(0x222222);
+        g.drawCircle(petX - 5.5 + faceOffset, petY - 1, 3.2);
+        g.drawCircle(petX + 5.5 + faceOffset, petY - 1, 3.2);
+        g.endFill();
+        // Sparkle
+        g.beginFill(0xffffff);
+        g.drawCircle(petX - 6.5 + faceOffset, petY - 2, 1.2);
+        g.drawCircle(petX + 4.5 + faceOffset, petY - 2, 1.2);
+        g.endFill();
+
+        // Nose (tiny triangle)
+        g.beginFill(0xff409f);
+        g.moveTo(petX - 1.5 + faceOffset, petY + 1.5);
+        g.lineTo(petX + 1.5 + faceOffset, petY + 1.5);
+        g.lineTo(petX + faceOffset, petY + 3);
+        g.endFill();
+
+        // Mouth
+        g.lineStyle(1.2, 0xff409f);
+        g.moveTo(petX - 2.5 + faceOffset, petY + 4);
+        g.quadraticCurveTo(petX - 1.25 + faceOffset, petY + 5.5, petX + faceOffset, petY + 4.2);
+        g.quadraticCurveTo(petX + 1.25 + faceOffset, petY + 5.5, petX + 2.5 + faceOffset, petY + 4);
+        g.lineStyle(0);
+
+        // Whiskers
+        g.lineStyle(1, 0xffffff, 0.9);
+        // Left whiskers
+        g.moveTo(petX - petR * 0.45 + faceOffset, petY + 2);
+        g.lineTo(petX - petR * 0.85 + faceOffset, petY + 1.2);
+        g.moveTo(petX - petR * 0.45 + faceOffset, petY + 3.2);
+        g.lineTo(petX - petR * 0.85 + faceOffset, petY + 3.8);
+        // Right whiskers
+        g.moveTo(petX + petR * 0.45 + faceOffset, petY + 2);
+        g.lineTo(petX + petR * 0.85 + faceOffset, petY + 1.2);
+        g.moveTo(petX + petR * 0.45 + faceOffset, petY + 3.2);
+        g.lineTo(petX + petR * 0.85 + faceOffset, petY + 3.8);
+        g.lineStyle(0);
+      }
     }
 
     if (char.state === 'dying') {
@@ -3246,38 +3507,55 @@ class Game {
 
     if (char.overheadText) {
       char.overheadText.visible = true;
-      char.overheadText.x = char.x;
-      char.overheadText.y = char.y - char.radius - 15;
+      char.overheadText.x = drawX;
+      char.overheadText.y = drawY - char.radius - 15;
     }
 
     g.beginFill(0x000000, 0.25);
-    g.drawEllipse(char.x, char.y + char.radius - 2, char.radius * 0.9, 6);
+    if (char.hasPet && char.state === 'normal') {
+      g.drawEllipse(char.x, char.y + 18, char.radius * 1.3, 8);
+    } else {
+      g.drawEllipse(char.x, char.y + char.radius - 2, char.radius * 0.9, 6);
+    }
     g.endFill();
 
     g.beginFill(char.color);
-    g.drawCircle(char.x, char.y, char.radius);
+    g.drawCircle(drawX, drawY, char.radius);
     g.endFill();
 
+    // Draw Player's dangling feet when riding a pet
+    if (char.hasPet && char.state === 'normal') {
+      g.beginFill(char.color);
+      g.drawCircle(drawX - char.radius * 0.7, drawY + char.radius * 0.6, 4.5);
+      g.drawCircle(drawX + char.radius * 0.7, drawY + char.radius * 0.6, 4.5);
+      g.endFill();
+      // shoes
+      g.beginFill(0xffffff);
+      g.drawCircle(drawX - char.radius * 0.75, drawY + char.radius * 0.7, 3);
+      g.drawCircle(drawX + char.radius * 0.75, drawY + char.radius * 0.7, 3);
+      g.endFill();
+    }
+
     g.beginFill(char.faceColor);
-    g.drawRoundedRect(char.x - char.radius * 0.65, char.y - char.radius * 0.2, char.radius * 1.3, char.radius * 0.8, 6);
+    g.drawRoundedRect(drawX - char.radius * 0.65, drawY - char.radius * 0.2, char.radius * 1.3, char.radius * 0.8, 6);
     g.endFill();
 
     g.beginFill(0x111111);
     const eyeOffset = char.dirX * 4;
-    g.drawCircle(char.x - 5 + eyeOffset, char.y + char.radius * 0.2, 3.5);
-    g.drawCircle(char.x + 5 + eyeOffset, char.y + char.radius * 0.2, 3.5);
+    g.drawCircle(drawX - 5 + eyeOffset, drawY + char.radius * 0.2, 3.5);
+    g.drawCircle(drawX + 5 + eyeOffset, drawY + char.radius * 0.2, 3.5);
     g.endFill();
 
     g.beginFill(0xffffff, 0.35);
-    g.drawCircle(char.x - char.radius * 0.4, char.y - char.radius * 0.4, char.radius * 0.25);
+    g.drawCircle(drawX - char.radius * 0.4, drawY - char.radius * 0.4, char.radius * 0.25);
     g.endFill();
 
     // Draw Team Indicator Above Head
     const teamColor = char.team === 'red' ? 0xff4d4d : 0x4d4dff;
     g.beginFill(teamColor);
-    g.moveTo(char.x - 6, char.y - char.radius - 12);
-    g.lineTo(char.x + 6, char.y - char.radius - 12);
-    g.lineTo(char.x, char.y - char.radius - 6);
+    g.moveTo(drawX - 6, drawY - char.radius - 12);
+    g.lineTo(drawX + 6, drawY - char.radius - 12);
+    g.lineTo(drawX, drawY - char.radius - 6);
     g.endFill();
   }
 

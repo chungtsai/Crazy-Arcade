@@ -88,5 +88,7 @@ const ITEM_TYPES = {
   SPEED_UP: 5,
   NEEDLE: 6,
   DART: 7,
-  PET: 8
+  PET: 8,
+  PET_FAST_TURTLE: 9,
+  PET_SLOW_TURTLE: 10
 };
