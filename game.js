@@ -330,6 +330,10 @@ class Game {
     this.menuBtn = document.getElementById('menu-btn');
     
     this.selectedChar = 'dao';
+    this.selectedChar2 = 'bazzi';
+    this.player2Team = 'red';
+    this.is2PMode = false;
+    this.player2 = null;
     this.selectedMap = 'sea14';
     this.timeLeft = 180;
     this.timerInterval = null;
@@ -339,19 +343,455 @@ class Game {
 
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     window.addEventListener('keyup', this.handleKeyUp.bind(this));
+    window.addEventListener('gamepadconnected', this.handleGamepadConnected.bind(this));
+    window.addEventListener('gamepaddisconnected', this.handleGamepadDisconnected.bind(this));
+
+    this.gamepadInputs = [
+      { dx: 0, dy: 0, placeBubble: false, useItem: false },
+      { dx: 0, dy: 0, placeBubble: false, useItem: false }
+    ];
+    this.prevGamepadStates = [
+      { placeBubblePressed: false, useItemPressed: false },
+      { placeBubblePressed: false, useItemPressed: false }
+    ];
+
+    this.lobbyRowIdx = 0;
+    this.lobbyColIdx = 0;
+    this.pauseFocusIdx = 0;
+    this.resultFocusIdx = 0;
+    this.prevMenuGamepadState = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      click: false,
+      back: false,
+      togglePause: false
+    };
 
     this.setupMobileControls();
     this.setupLobby();
+
+    // Start gamepad menu navigation loop
+    this.startGamepadMenuLoop();
+  }
+
+  getCharacters() {
+    return this.is2PMode && this.player2 ? [this.player, this.player2, ...this.cpus] : [this.player, ...this.cpus];
+  }
+
+  handleGamepadConnected(e) {
+    console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
+      e.gamepad.index, e.gamepad.id,
+      e.gamepad.buttons.length, e.gamepad.axes.length);
+    
+    const playerNum = e.gamepad.index + 1;
+    this.showToast(`🎮 已偵測到遙桿 ${playerNum}：${e.gamepad.id.substring(0, 15)}...`, 'gamepad-connect');
+  }
+
+  handleGamepadDisconnected(e) {
+    console.log("Gamepad disconnected from index %d: %s",
+      e.gamepad.index, e.gamepad.id);
+    
+    const playerNum = e.gamepad.index + 1;
+    this.showToast(`❌ 搖桿 ${playerNum} 已中斷連接`, 'gamepad-disconnect');
+  }
+
+  showToast(message, type = '') {
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    setTimeout(() => {
+      toast.classList.add('show');
+    }, 50);
+
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.remove();
+      }, 400);
+    }, 3000);
+  }
+
+  pollGamepads() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    
+    for (let i = 0; i < 2; i++) {
+      const gp = gamepads[i];
+      if (!gp) {
+        this.gamepadInputs[i] = { dx: 0, dy: 0, placeBubble: false, useItem: false };
+        continue;
+      }
+
+      const input = this.gamepadInputs[i];
+      const prev = this.prevGamepadStates[i];
+
+      // Left joystick / D-pad movement
+      const deadzone = 0.25;
+      let ax = gp.axes[0] || 0;
+      let ay = gp.axes[1] || 0;
+      if (Math.abs(ax) < deadzone) ax = 0;
+      if (Math.abs(ay) < deadzone) ay = 0;
+
+      // D-pad check
+      let dpadUp = gp.buttons[12] && gp.buttons[12].pressed;
+      let dpadDown = gp.buttons[13] && gp.buttons[13].pressed;
+      let dpadLeft = gp.buttons[14] && gp.buttons[14].pressed;
+      let dpadRight = gp.buttons[15] && gp.buttons[15].pressed;
+
+      if (dpadUp) ay = -1;
+      if (dpadDown) ay = 1;
+      if (dpadLeft) ax = -1;
+      if (dpadRight) ax = 1;
+
+      // Normalize diagonal inputs
+      if (ax !== 0 && ay !== 0) {
+        const length = Math.sqrt(ax * ax + ay * ay);
+        input.dx = ax / length;
+        input.dy = ay / length;
+      } else {
+        input.dx = ax;
+        input.dy = ay;
+      }
+
+      // Bubble placement (Button 0: A/Cross, Button 2: X/Square)
+      const btnA = gp.buttons[0] && gp.buttons[0].pressed;
+      const btnX = gp.buttons[2] && gp.buttons[2].pressed;
+      const currentPlace = btnA || btnX;
+
+      // Item usage (Button 1: B/Circle, Button 3: Y/Triangle, Buttons 4,5: LB/RB)
+      const btnB = gp.buttons[1] && gp.buttons[1].pressed;
+      const btnY = gp.buttons[3] && gp.buttons[3].pressed;
+      const btnL1 = gp.buttons[4] && gp.buttons[4].pressed;
+      const btnR1 = gp.buttons[5] && gp.buttons[5].pressed;
+      const currentUseItem = btnB || btnY || btnL1 || btnR1;
+
+      // Trigger actions on button-down transition (edge detection)
+      const player = (i === 1 && this.is2PMode) ? this.player2 : this.player;
+      
+      if (player && this.gameActive) {
+        // Place bubble
+        if (currentPlace && !prev.placeBubblePressed) {
+          if (player.state === 'normal') {
+            this.placeBubble(player);
+          }
+        }
+        
+        // Use item
+        if (currentUseItem && !prev.useItemPressed) {
+          this.useActiveItem(player);
+        }
+      }
+
+      // Save states for next frame edge detection
+      prev.placeBubblePressed = currentPlace;
+      prev.useItemPressed = currentUseItem;
+    }
+  }
+
+  startGamepadMenuLoop() {
+    const loop = () => {
+      this.pollGamepadForMenus();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  pollGamepadForMenus() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    
+    let gp = null;
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) {
+        gp = gamepads[i];
+        break;
+      }
+    }
+    
+    if (!gp) return;
+
+    // Read directions
+    const deadzone = 0.4;
+    let ax = gp.axes[0] || 0;
+    let ay = gp.axes[1] || 0;
+    
+    let up = (ay < -deadzone) || (gp.buttons[12] && gp.buttons[12].pressed);
+    let down = (ay > deadzone) || (gp.buttons[13] && gp.buttons[13].pressed);
+    let left = (ax < -deadzone) || (gp.buttons[14] && gp.buttons[14].pressed);
+    let right = (ax > deadzone) || (gp.buttons[15] && gp.buttons[15].pressed);
+    
+    let click = gp.buttons[0] && gp.buttons[0].pressed; // A button / Cross
+    let back = gp.buttons[1] && gp.buttons[1].pressed;  // B button / Circle
+    let togglePause = gp.buttons[9] && gp.buttons[9].pressed; // Start button
+
+    const prev = this.prevMenuGamepadState;
+
+    // Edge detection for menus
+    let moveUp = up && !prev.up;
+    let moveDown = down && !prev.down;
+    let moveLeft = left && !prev.left;
+    let moveRight = right && !prev.right;
+    let doClick = click && !prev.click;
+    let doBack = back && !prev.back;
+    let doTogglePause = togglePause && !prev.togglePause;
+
+    // Save state
+    prev.up = up;
+    prev.down = down;
+    prev.left = left;
+    prev.right = right;
+    prev.click = click;
+    prev.back = back;
+    prev.togglePause = togglePause;
+
+    if (moveUp || moveDown || moveLeft || moveRight || doClick || doBack || doTogglePause) {
+      this.handleMenuGamepadInput({ moveUp, moveDown, moveLeft, moveRight, doClick, doBack, doTogglePause });
+    }
+  }
+
+  handleMenuGamepadInput(input) {
+    const { moveUp, moveDown, moveLeft, moveRight, doClick, doBack, doTogglePause } = input;
+
+    if (doTogglePause) {
+      this.toggleGamePause();
+      return;
+    }
+
+    if (this.pauseModal && this.pauseModal.classList.contains('active')) {
+      const buttons = this.getPauseModalButtons();
+      if (buttons.length === 0) return;
+
+      if (moveDown) {
+        this.pauseFocusIdx = (this.pauseFocusIdx + 1) % buttons.length;
+        sfx.playClick();
+      } else if (moveUp) {
+        this.pauseFocusIdx = (this.pauseFocusIdx - 1 + buttons.length) % buttons.length;
+        sfx.playClick();
+      } else if (doClick) {
+        buttons[this.pauseFocusIdx].click();
+      } else if (doBack) {
+        this.toggleGamePause(); // Resume
+      }
+      this.updateMenuFocus();
+      return;
+    }
+
+    if (this.resultOverlay && this.resultOverlay.classList.contains('active')) {
+      const buttons = this.getResultButtons();
+      if (buttons.length === 0) return;
+
+      if (moveDown || moveRight) {
+        this.resultFocusIdx = (this.resultFocusIdx + 1) % buttons.length;
+        sfx.playClick();
+      } else if (moveUp || moveLeft) {
+        this.resultFocusIdx = (this.resultFocusIdx - 1 + buttons.length) % buttons.length;
+        sfx.playClick();
+      } else if (doClick) {
+        buttons[this.resultFocusIdx].click();
+      }
+      this.updateMenuFocus();
+      return;
+    }
+
+    if (this.lobbyScreen && this.lobbyScreen.classList.contains('active')) {
+      const rows = this.getLobbyRows();
+      if (rows.length === 0) return;
+
+      if (moveDown) {
+        this.lobbyRowIdx = (this.lobbyRowIdx + 1) % rows.length;
+        this.lobbyColIdx = Math.min(this.lobbyColIdx, rows[this.lobbyRowIdx].length - 1);
+        sfx.playClick();
+      } else if (moveUp) {
+        this.lobbyRowIdx = (this.lobbyRowIdx - 1 + rows.length) % rows.length;
+        this.lobbyColIdx = Math.min(this.lobbyColIdx, rows[this.lobbyRowIdx].length - 1);
+        sfx.playClick();
+      } else if (moveRight) {
+        const currentRow = rows[this.lobbyRowIdx];
+        this.lobbyColIdx = (this.lobbyColIdx + 1) % currentRow.length;
+        sfx.playClick();
+      } else if (moveLeft) {
+        const currentRow = rows[this.lobbyRowIdx];
+        this.lobbyColIdx = (this.lobbyColIdx - 1 + currentRow.length) % currentRow.length;
+        sfx.playClick();
+      } else if (doClick) {
+        const target = rows[this.lobbyRowIdx][this.lobbyColIdx];
+        if (target) target.click();
+      }
+      this.updateMenuFocus();
+      return;
+    }
+  }
+
+  updateMenuFocus() {
+    // Clear previous highlights
+    document.querySelectorAll('.gamepad-focused').forEach(el => {
+      el.classList.remove('gamepad-focused');
+    });
+
+    if (this.pauseModal && this.pauseModal.classList.contains('active')) {
+      const buttons = this.getPauseModalButtons();
+      if (buttons.length > 0) {
+        this.pauseFocusIdx = Math.max(0, Math.min(this.pauseFocusIdx, buttons.length - 1));
+        const target = buttons[this.pauseFocusIdx];
+        if (target) target.classList.add('gamepad-focused');
+      }
+    } else if (this.resultOverlay && this.resultOverlay.classList.contains('active')) {
+      const buttons = this.getResultButtons();
+      if (buttons.length > 0) {
+        this.resultFocusIdx = Math.max(0, Math.min(this.resultFocusIdx, buttons.length - 1));
+        const target = buttons[this.resultFocusIdx];
+        if (target) target.classList.add('gamepad-focused');
+      }
+    } else if (this.lobbyScreen && this.lobbyScreen.classList.contains('active')) {
+      const rows = this.getLobbyRows();
+      if (rows.length > 0) {
+        this.lobbyRowIdx = Math.max(0, Math.min(this.lobbyRowIdx, rows.length - 1));
+        const currentRow = rows[this.lobbyRowIdx];
+        if (currentRow && currentRow.length > 0) {
+          this.lobbyColIdx = Math.max(0, Math.min(this.lobbyColIdx, currentRow.length - 1));
+          const target = currentRow[this.lobbyColIdx];
+          if (target) target.classList.add('gamepad-focused');
+        }
+      }
+    }
+  }
+
+  resetMenuFocus() {
+    this.lobbyRowIdx = 0;
+    this.lobbyColIdx = 0;
+    this.pauseFocusIdx = 0;
+    this.resultFocusIdx = 0;
+    this.updateMenuFocus();
+  }
+
+  clearMenuFocus() {
+    document.querySelectorAll('.gamepad-focused').forEach(el => {
+      el.classList.remove('gamepad-focused');
+    });
+  }
+
+  getPauseModalButtons() {
+    const modal = document.getElementById('pause-modal');
+    if (!modal) return [];
+    const allButtons = Array.from(modal.querySelectorAll('.btn'));
+    return allButtons.filter(btn => {
+      const style = window.getComputedStyle(btn);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+  }
+
+  getResultButtons() {
+    const overlay = document.getElementById('result-overlay');
+    if (!overlay) return [];
+    return Array.from(overlay.querySelectorAll('.btn'));
+  }
+
+  getLobbyRows() {
+    const rows = [];
+    
+    // Row 0: Map selection (visually first)
+    const maps = Array.from(document.querySelectorAll('.map-card'));
+    if (maps.length > 0) rows.push(maps);
+
+    // Row 1: Mode selection (visually second)
+    const modes = Array.from(document.querySelectorAll('.mode-card'));
+    if (modes.length > 0) rows.push(modes);
+    
+    // Row 2: P1 character selection
+    const p1Chars = Array.from(document.querySelectorAll('.p1-grid .char-card'));
+    if (p1Chars.length > 0) rows.push(p1Chars);
+    
+    // Row 3: P2 character selection (only if visible)
+    const p2Sel = document.querySelector('.p2-selection');
+    if (p2Sel && p2Sel.style.display !== 'none') {
+      const p2Chars = Array.from(document.querySelectorAll('.p2-grid .char-card'));
+      if (p2Chars.length > 0) rows.push(p2Chars);
+    }
+    
+    // Row 4: CPU selection
+    const cpus = Array.from(document.querySelectorAll('.cpu-opt-btn'));
+    if (cpus.length > 0) rows.push(cpus);
+    
+    // Row 5: Team toggles (only clickable ones)
+    const teamToggles = Array.from(document.querySelectorAll('.team-toggle-btn')).filter(btn => !btn.disabled);
+    if (teamToggles.length > 0) rows.push(teamToggles);
+    
+    // Row 6: Start button
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) rows.push([startBtn]);
+    
+    return rows;
+  }
+
+  toggleGamePause() {
+    if (this.gameActive && !this.gameEnding) {
+      sfx.playClick();
+      this.gameActive = false;
+      if (this.pauseModal) {
+        this.pauseModal.classList.add('active');
+        this.resetMenuFocus();
+      }
+    } else if (!this.gameActive && this.pauseModal && this.pauseModal.classList.contains('active')) {
+      sfx.playClick();
+      this.gameActive = true;
+      this.pauseModal.classList.remove('active');
+      this.clearMenuFocus();
+    }
   }
 
   setupLobby() {
-    const cards = document.querySelectorAll('.char-card');
-    cards.forEach(card => {
+    // Mode selection cards
+    const modeCards = document.querySelectorAll('.mode-card');
+    modeCards.forEach(card => {
       card.addEventListener('click', () => {
         sfx.playClick();
-        cards.forEach(c => c.classList.remove('active'));
+        modeCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.is2PMode = card.dataset.mode === '2p';
+
+        // Toggle character selection headers and Player 2 selection visibility
+        const p2Sel = document.querySelector('.p2-selection');
+        const p1Title = document.querySelector('.p1-selection h3');
+        const guide1p = document.getElementById('controls-guide-1p');
+        const guide2p = document.getElementById('controls-guide-2p');
+        if (this.is2PMode) {
+          if (p2Sel) p2Sel.style.display = 'block';
+          if (p1Title) p1Title.textContent = '選擇 1P 角色';
+          if (guide1p) guide1p.style.display = 'none';
+          if (guide2p) guide2p.style.display = 'block';
+        } else {
+          if (p2Sel) p2Sel.style.display = 'none';
+          if (p1Title) p1Title.textContent = '選擇角色';
+          if (guide1p) guide1p.style.display = 'block';
+          if (guide2p) guide2p.style.display = 'none';
+        }
+
+        this.updateTeamSlotsUI();
+      });
+    });
+
+    const p1Cards = document.querySelectorAll('.p1-grid .char-card');
+    p1Cards.forEach(card => {
+      card.addEventListener('click', () => {
+        sfx.playClick();
+        p1Cards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         this.selectedChar = card.dataset.char;
+        this.updateTeamSlotsUI();
+      });
+    });
+
+    const p2Cards = document.querySelectorAll('.p2-grid .char-card');
+    p2Cards.forEach(card => {
+      card.addEventListener('click', () => {
+        sfx.playClick();
+        p2Cards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedChar2 = card.dataset.char;
         this.updateTeamSlotsUI();
       });
     });
@@ -398,6 +838,7 @@ class Game {
           this.gameActive = false;
           if (this.pauseModal) {
             this.pauseModal.classList.add('active');
+            this.resetMenuFocus();
           }
         }
       });
@@ -412,6 +853,18 @@ class Game {
         if (this.pauseModal) {
           this.pauseModal.classList.remove('active');
         }
+        this.clearMenuFocus();
+        // Clear focus so keypresses don't keep triggering button click
+        if (document.activeElement) {
+          document.activeElement.blur();
+        }
+        // Sync gamepad states to prevent input propagation on resume
+        if (this.prevGamepadStates) {
+          this.prevGamepadStates.forEach(state => {
+            state.placeBubblePressed = true;
+            state.useItemPressed = true;
+          });
+        }
       });
     }
 
@@ -422,6 +875,7 @@ class Game {
         if (this.pauseModal) {
           this.pauseModal.classList.remove('active');
         }
+        this.clearMenuFocus();
         this.restartGame();
       });
     }
@@ -433,12 +887,14 @@ class Game {
         if (this.pauseModal) {
           this.pauseModal.classList.remove('active');
         }
+        this.clearMenuFocus();
         this.endGame(null, 'abort');
       });
     }
 
     document.getElementById('play-again-btn').addEventListener('click', () => {
       sfx.playClick();
+      this.clearMenuFocus();
       this.restartGame();
     });
 
@@ -447,9 +903,11 @@ class Game {
       this.resultOverlay.classList.remove('active');
       this.lobbyScreen.classList.add('active');
       this.gameScreen.classList.remove('active');
+      this.resetMenuFocus();
     });
 
     this.updateTeamSlotsUI();
+    this.resetMenuFocus();
   }
 
   updateTeamSlotsUI() {
@@ -457,28 +915,56 @@ class Game {
     if (!container) return;
     container.innerHTML = '';
 
-    // 1. Add Player Slot
+    // 1. Add Player 1 Slot
     const playerCard = document.createElement('div');
-    playerCard.className = 'team-slot-card';
+    playerCard.className = 'team-slot-card team-red';
     const playerCharName = CHARACTER_CONFIGS[this.selectedChar].name;
     playerCard.innerHTML = `
       <div class="slot-avatar ${this.selectedChar}-color"></div>
-      <div class="slot-name">玩家 (${playerCharName})</div>
+      <div class="slot-name">玩家1 (${playerCharName})</div>
       <button class="team-toggle-btn team-red" disabled>紅隊</button>
     `;
     container.appendChild(playerCard);
 
-    // 2. Add CPU Slots
-    const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => char !== this.selectedChar);
+    // 2. Add Player 2 Slot if 2P Mode is active
+    if (this.is2PMode) {
+      const char2 = this.selectedChar2 || 'bazzi';
+      const player2CharName = CHARACTER_CONFIGS[char2].name;
+      const team = this.player2Team || 'red';
+      const teamLabel = team === 'red' ? '紅隊' : '藍隊';
+      const teamClass = team === 'red' ? 'team-red' : 'team-blue';
+
+      const player2Card = document.createElement('div');
+      player2Card.className = `team-slot-card ${teamClass}`;
+      player2Card.innerHTML = `
+        <div class="slot-avatar ${char2}-color"></div>
+        <div class="slot-name">玩家2 (${player2CharName})</div>
+        <button class="team-toggle-btn ${teamClass}" id="player2-team-toggle">${teamLabel}</button>
+      `;
+
+      player2Card.querySelector('#player2-team-toggle').addEventListener('click', () => {
+        sfx.playClick();
+        this.player2Team = this.player2Team === 'red' ? 'blue' : 'red';
+        this.updateTeamSlotsUI();
+      });
+
+      container.appendChild(player2Card);
+    }
+
+    // 3. Add CPU Slots
+    const selectedChars = this.is2PMode ? [this.selectedChar, this.selectedChar2 || 'bazzi'] : [this.selectedChar];
+    const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => !selectedChars.includes(char));
+    const finalCPUChars = availableCPUChars.length > 0 ? availableCPUChars : Object.keys(CHARACTER_CONFIGS);
+
     for (let i = 0; i < this.cpuCount; i++) {
-      const cpuChar = availableCPUChars[i % availableCPUChars.length];
+      const cpuChar = finalCPUChars[i % finalCPUChars.length];
       const cpuCharName = CHARACTER_CONFIGS[cpuChar].name;
       const team = this.cpuTeams[i] || 'blue';
       const teamLabel = team === 'red' ? '紅隊' : '藍隊';
       const teamClass = team === 'red' ? 'team-red' : 'team-blue';
 
       const cpuCard = document.createElement('div');
-      cpuCard.className = 'team-slot-card';
+      cpuCard.className = `team-slot-card ${teamClass}`;
       cpuCard.innerHTML = `
         <div class="slot-avatar ${cpuChar}-color"></div>
         <div class="slot-name">CPU ${i + 1} (${cpuCharName})</div>
@@ -752,10 +1238,12 @@ class Game {
   }
 
   restartGame() {
+    this.clearMenuFocus();
     this.startGame();
   }
 
   startGame() {
+    this.clearMenuFocus();
     this.lobbyScreen.classList.remove('active');
     this.gameScreen.classList.add('active');
     this.resultOverlay.classList.remove('active');
@@ -860,36 +1348,144 @@ class Game {
     this.player.countdownText.visible = false;
     this.characterContainer.addChild(this.player.countdownText);
 
-    // Make player trapped state click-to-rescue active
+    // Overhead 1P label
+    const overheadStyle1 = new PIXI.TextStyle({
+      fontFamily: 'Outfit',
+      fontSize: 12,
+      fontWeight: '900',
+      fill: '#ffffff',
+      stroke: '#ff3333',
+      strokeThickness: 3,
+      align: 'center'
+    });
+    this.player.overheadText = new PIXI.Text('1P', overheadStyle1);
+    this.player.overheadText.anchor.set(0.5, 1);
+    this.characterContainer.addChild(this.player.overheadText);
+
     this.player.countdownText.interactive = true;
     this.player.countdownText.cursor = 'pointer';
     this.player.countdownText.on('pointerdown', () => {
-      this.useActiveItem();
+      this.useActiveItem(this.player);
     });
 
     this.player.graphics.interactive = true;
     this.player.graphics.cursor = 'pointer';
     this.player.graphics.on('pointerdown', () => {
-      this.useActiveItem();
+      this.useActiveItem(this.player);
     });
 
-    // Apply player HUD team styling
-    const playerProfileEl = document.querySelector('.player-profile');
-    if (playerProfileEl) {
-      playerProfileEl.className = 'player-profile team-red';
-      const nameEl = playerProfileEl.querySelector('.profile-name');
+    // Initialize Player 2 if in 2P Mode
+    if (this.is2PMode) {
+      const config2 = CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'];
+      this.player2 = {
+        x: TILE_SIZE * 0.5 + 2,
+        y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, // Starts at Bottom-Left
+        radius: TILE_SIZE * 0.38,
+        speed: config2.speed,
+        maxBubbles: config2.maxBubbles,
+        bubbleLength: config2.maxLen,
+        itemSlot: null,
+        hasPet: false,
+        color: config2.color,
+        faceColor: config2.faceColor,
+        isCPU: false,
+        state: 'normal',
+        trapTimer: 0,
+        graphics: new PIXI.Graphics(),
+        placedCount: 0,
+        dirX: 0,
+        dirY: -1,
+        team: this.player2Team || 'red'
+      };
+
+      this.characterContainer.addChild(this.player2.graphics);
+
+      const player2Style = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: '#ffffff',
+        stroke: this.player2.team === 'red' ? '#ff3333' : '#3333ff',
+        strokeThickness: 3.5,
+        align: 'center'
+      });
+      this.player2.countdownText = new PIXI.Text('', player2Style);
+      this.player2.countdownText.anchor.set(0.5);
+      this.player2.countdownText.visible = false;
+      this.characterContainer.addChild(this.player2.countdownText);
+
+      // Overhead 2P label
+      const overheadStyle2 = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 12,
+        fontWeight: '900',
+        fill: '#ffffff',
+        stroke: this.player2.team === 'red' ? '#ff3333' : '#3333ff',
+        strokeThickness: 3,
+        align: 'center'
+      });
+      this.player2.overheadText = new PIXI.Text('2P', overheadStyle2);
+      this.player2.overheadText.anchor.set(0.5, 1);
+      this.characterContainer.addChild(this.player2.overheadText);
+
+      this.player2.countdownText.interactive = true;
+      this.player2.countdownText.cursor = 'pointer';
+      this.player2.countdownText.on('pointerdown', () => {
+        this.useActiveItem(this.player2);
+      });
+
+      this.player2.graphics.interactive = true;
+      this.player2.graphics.cursor = 'pointer';
+      this.player2.graphics.on('pointerdown', () => {
+        this.useActiveItem(this.player2);
+      });
+    } else {
+      this.player2 = null;
+    }
+
+    // Apply player 1 HUD team styling
+    const player1HudEl = document.getElementById('player1-hud');
+    if (player1HudEl) {
+      player1HudEl.className = 'player-profile team-red';
+      const nameEl = player1HudEl.querySelector('.profile-name');
       if (nameEl) {
         nameEl.innerHTML = `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${CHARACTER_CONFIGS[this.selectedChar].name}`;
       }
     }
 
+    // Setup player 2 HUD visibility and team styling
+    const player2HudEl = document.getElementById('player2-hud');
+    if (player2HudEl) {
+      if (this.is2PMode && this.player2) {
+        player2HudEl.style.display = 'flex';
+        const teamColor = this.player2.team === 'red' ? '#ff8080' : '#809fff';
+        const teamText = this.player2.team === 'red' ? '紅隊' : '藍隊';
+        player2HudEl.className = `player-profile team-${this.player2.team}`;
+        const nameEl = player2HudEl.querySelector('.profile-name');
+        if (nameEl) {
+          nameEl.innerHTML = `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'].name}`;
+        }
+      } else {
+        player2HudEl.style.display = 'none';
+      }
+    }
+
     this.cpus = [];
-    const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => char !== this.selectedChar);
+    const selectedChars = this.is2PMode ? [this.selectedChar, this.selectedChar2 || 'bazzi'] : [this.selectedChar];
+    const availableCPUChars = Object.keys(CHARACTER_CONFIGS).filter(char => !selectedChars.includes(char));
+    const finalCPUChars = availableCPUChars.length > 0 ? availableCPUChars : Object.keys(CHARACTER_CONFIGS);
+
+    // Skip bottom-left start position if P2 is active
+    const activeCPUPositions = [];
+    for (let pIdx = 0; pIdx < CPU_START_POSITIONS.length; pIdx++) {
+      if (this.is2PMode && pIdx === 2) continue;
+      activeCPUPositions.push(CPU_START_POSITIONS[pIdx]);
+    }
 
     for (let i = 0; i < this.cpuCount; i++) {
-      const cpuChar = availableCPUChars[i % availableCPUChars.length];
+      const cpuChar = finalCPUChars[i % finalCPUChars.length];
       const cpuConfig = CHARACTER_CONFIGS[cpuChar];
-      const pos = CPU_START_POSITIONS[i];
+      const pos = activeCPUPositions[i % activeCPUPositions.length];
       const cpu = {
         id: i + 1,
         charKey: cpuChar,
@@ -937,29 +1533,21 @@ class Game {
     }
 
     const cpuHudContainer = document.getElementById('cpu-hud-container');
-    cpuHudContainer.innerHTML = '';
-    this.cpus.forEach(cpu => {
-      const cpuProfile = document.createElement('div');
-      cpuProfile.className = `player-profile cpu team-${cpu.team}`;
-      cpuProfile.id = `cpu-profile-${cpu.id}`;
-      
-      const teamLabel = cpu.team === 'red' ? '<span style="color: #ff8080; font-weight: bold;">[紅隊]</span>' : '<span style="color: #809fff; font-weight: bold;">[藍隊]</span>';
-
-      cpuProfile.innerHTML = `
-        <div class="profile-details">
-          <div class="profile-name">${teamLabel} ${CHARACTER_CONFIGS[cpu.charKey].name} (CPU ${cpu.id})</div>
-          <div class="hud-item-stats">
-            <span class="hud-stat" id="hud-c-bubble-${cpu.id}">🎈 0/${cpu.maxBubbles}</span>
-            <span class="hud-stat" id="hud-c-len-${cpu.id}">📏 ${cpu.bubbleLength}</span>
-            <span class="hud-stat" id="hud-c-speed-${cpu.id}">⚡ ${cpu.speed.toFixed(1)}</span>
-            <span class="hud-stat hud-item-slot" id="hud-c-item-${cpu.id}">🎒</span>
-            <span class="hud-stat hud-item-slot" id="hud-c-pet-${cpu.id}">🐱</span>
-          </div>
+    cpuHudContainer.innerHTML = `
+      <div class="team-remaining-hud">
+        <div class="team-hud-badge team-red">
+          <span class="team-dot">🔴</span>
+          <span class="team-name">紅隊</span>
+          <span class="team-count-val" id="hud-red-alive-count">0</span>
         </div>
-        <div class="profile-avatar ${cpu.charKey}-color" id="cpu-hud-avatar-${cpu.id}"></div>
-      `;
-      cpuHudContainer.appendChild(cpuProfile);
-    });
+        <div class="team-hud-separator"></div>
+        <div class="team-hud-badge team-blue">
+          <span class="team-dot">🔵</span>
+          <span class="team-name">藍隊</span>
+          <span class="team-count-val" id="hud-blue-alive-count">0</span>
+        </div>
+      </div>
+    `;
 
     this.updateHUD();
 
@@ -1017,10 +1605,12 @@ class Game {
       }
 
       const pAvatar = document.getElementById('player-hud-avatar');
-      pAvatar.className = 'profile-avatar';
-      pAvatar.classList.add(this.selectedChar === 'dao' ? 'dao-color' : (this.selectedChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+      if (pAvatar) {
+        pAvatar.className = 'profile-avatar';
+        pAvatar.classList.add(this.selectedChar === 'dao' ? 'dao-color' : (this.selectedChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+      }
 
-      const playerProfileEl = document.querySelector('.player-profile');
+      const playerProfileEl = document.getElementById('player1-hud');
       if (playerProfileEl) {
         if (this.player.state === 'dead' || this.player.state === 'dying') {
           playerProfileEl.classList.add('eliminated');
@@ -1065,44 +1655,56 @@ class Game {
       }
     }
 
-    if (this.cpus) {
-      this.cpus.forEach(cpu => {
-        const bubbleEl = document.getElementById(`hud-c-bubble-${cpu.id}`);
-        const lenEl = document.getElementById(`hud-c-len-${cpu.id}`);
-        const speedEl = document.getElementById(`hud-c-speed-${cpu.id}`);
-        const itemEl = document.getElementById(`hud-c-item-${cpu.id}`);
-        const petEl = document.getElementById(`hud-c-pet-${cpu.id}`);
-        const profileEl = document.getElementById(`cpu-profile-${cpu.id}`);
-        
-        if (bubbleEl) bubbleEl.textContent = `🎈 ${cpu.placedCount}/${cpu.maxBubbles}`;
-        if (lenEl) lenEl.textContent = `📏 ${cpu.bubbleLength}`;
-        if (speedEl) speedEl.textContent = `⚡ ${cpu.speed.toFixed(1)}`;
-        if (itemEl) {
-          let itemText = '🎒';
-          itemEl.classList.remove('has-item');
-          if (cpu.itemSlot === 'needle') {
-            itemText = '📍';
-            itemEl.classList.add('has-item');
-          } else if (cpu.itemSlot === 'dart') {
-            itemText = '🎯';
-            itemEl.classList.add('has-item');
-          }
-          itemEl.textContent = itemText;
+    if (this.is2PMode && this.player2) {
+      document.getElementById('hud-p2-bubble').textContent = `🎈 ${this.player2.placedCount}/${this.player2.maxBubbles}`;
+      document.getElementById('hud-p2-len').textContent = `📏 ${this.player2.bubbleLength}`;
+      document.getElementById('hud-p2-speed').textContent = `⚡ ${this.player2.speed.toFixed(1)}`;
+      
+      const itemEl = document.getElementById('hud-p2-item');
+      if (itemEl) {
+        let itemText = '🎒';
+        itemEl.classList.remove('has-item');
+        if (this.player2.itemSlot === 'needle') {
+          itemText = '📍';
+          itemEl.classList.add('has-item');
+        } else if (this.player2.itemSlot === 'dart') {
+          itemText = '🎯';
+          itemEl.classList.add('has-item');
         }
-        if (petEl) {
-          petEl.textContent = '🐱';
-          petEl.classList.toggle('has-pet', !!cpu.hasPet);
+        itemEl.textContent = itemText;
+      }
+      
+      const pPetEl = document.getElementById('hud-p2-pet');
+      if (pPetEl) {
+        pPetEl.textContent = '🐱';
+        pPetEl.classList.toggle('has-pet', !!this.player2.hasPet);
+      }
+
+      const pAvatar = document.getElementById('player2-hud-avatar');
+      if (pAvatar) {
+        const char2 = this.selectedChar2 || 'bazzi';
+        pAvatar.className = 'profile-avatar';
+        pAvatar.classList.add(char2 === 'dao' ? 'dao-color' : (char2 === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+      }
+
+      const player2ProfileEl = document.getElementById('player2-hud');
+      if (player2ProfileEl) {
+        if (this.player2.state === 'dead' || this.player2.state === 'dying') {
+          player2ProfileEl.classList.add('eliminated');
+        } else {
+          player2ProfileEl.classList.remove('eliminated');
         }
-        
-        if (profileEl) {
-          if (cpu.state === 'dead' || cpu.state === 'dying') {
-            profileEl.classList.add('eliminated');
-          } else {
-            profileEl.classList.remove('eliminated');
-          }
-        }
-      });
+      }
     }
+
+    const chars = this.getCharacters();
+    const redAlive = chars.filter(c => c.team === 'red' && c.state !== 'dead' && c.state !== 'dying').length;
+    const blueAlive = chars.filter(c => c.team === 'blue' && c.state !== 'dead' && c.state !== 'dying').length;
+
+    const redAliveEl = document.getElementById('hud-red-alive-count');
+    const blueAliveEl = document.getElementById('hud-blue-alive-count');
+    if (redAliveEl) redAliveEl.textContent = redAlive;
+    if (blueAliveEl) blueAliveEl.textContent = blueAlive;
   }
 
   drawBackground() {
@@ -1168,35 +1770,35 @@ class Game {
     this.mapContainer.addChild(mainG);
   }
 
-  useActiveItem() {
-    if (!this.gameActive || !this.player || this.gameEnding) return;
+  useActiveItem(player = this.player) {
+    if (!this.gameActive || !player || this.gameEnding) return;
     
-    if (this.player.itemSlot === 'needle') {
-      if (this.player.state === 'trapped') {
-        this.player.itemSlot = null;
-        this.player.state = 'normal';
+    if (player.itemSlot === 'needle') {
+      if (player.state === 'trapped') {
+        player.itemSlot = null;
+        player.state = 'normal';
         sfx.playNeedle();
         this.updateHUD();
       }
-    } else if (this.player.itemSlot === 'dart') {
-      if (this.player.state === 'normal') {
-        this.player.itemSlot = null;
+    } else if (player.itemSlot === 'dart') {
+      if (player.state === 'normal') {
+        player.itemSlot = null;
         sfx.playNeedle(); // Play shot sound
         this.updateHUD();
 
-        let dx = this.player.dirX;
-        let dy = this.player.dirY;
+        let dx = player.dirX;
+        let dy = player.dirY;
         if (dx === 0 && dy === 0) {
           dy = 1;
         }
 
         const dart = {
-          x: this.player.x,
-          y: this.player.y,
+          x: player.x,
+          y: player.y,
           dirX: dx,
           dirY: dy,
           graphics: new PIXI.Graphics(),
-          owner: this.player,
+          owner: player,
           speed: 360
         };
         this.app.stage.addChild(dart.graphics);
@@ -1206,14 +1808,43 @@ class Game {
   }
 
   handleKeyDown(e) {
-    if (e.code === 'Space') {
+    // Ignore gameplay key inputs if they are targeted at HTML button controls (e.g. menu buttons)
+    if (e.target && e.target.tagName === 'BUTTON') {
+      return;
+    }
+
+    if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Slash') {
       e.preventDefault();
     }
     
     this.keys[e.code] = true;
 
-    if (e.code === 'KeyN') {
-      this.useActiveItem();
+    // Menu navigation keys when game is not active (e.g., lobby, pause, game-over screen)
+    // This supports standard TV remote controllers (which send keyboard events) and keyboards.
+    if (!this.gameActive) {
+      const moveUp = e.code === 'ArrowUp' || e.code === 'KeyW';
+      const moveDown = e.code === 'ArrowDown' || e.code === 'KeyS';
+      const moveLeft = e.code === 'ArrowLeft' || e.code === 'KeyA';
+      const moveRight = e.code === 'ArrowRight' || e.code === 'KeyD';
+      const doClick = e.code === 'Enter' || e.code === 'Space';
+      const doBack = e.code === 'Escape' || e.code === 'Backspace';
+      const doTogglePause = false;
+
+      if (moveUp || moveDown || moveLeft || moveRight || doClick || doBack) {
+        this.handleMenuGamepadInput({ moveUp, moveDown, moveLeft, moveRight, doClick, doBack, doTogglePause });
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Player 1 use item
+    if (e.code === 'KeyN' || e.code === 'KeyF' || e.code === 'KeyE') {
+      this.useActiveItem(this.player);
+    }
+
+    // Player 2 use item
+    if (this.is2PMode && this.player2 && (e.code === 'KeyM' || e.code === 'Period' || e.code === 'ShiftRight' || e.code === 'KeyL')) {
+      this.useActiveItem(this.player2);
     }
 
     if (e.code === 'Escape') {
@@ -1222,16 +1853,35 @@ class Game {
         this.gameActive = false;
         if (this.pauseModal) {
           this.pauseModal.classList.add('active');
+          this.resetMenuFocus();
         }
       } else if (!this.gameActive && this.pauseModal && this.pauseModal.classList.contains('active')) {
         sfx.playClick();
         this.gameActive = true;
         this.pauseModal.classList.remove('active');
+        this.clearMenuFocus();
+        // Clear focus so keypresses don't keep triggering button click
+        if (document.activeElement) {
+          document.activeElement.blur();
+        }
+        // Sync gamepad states to prevent input propagation on resume
+        if (this.prevGamepadStates) {
+          this.prevGamepadStates.forEach(state => {
+            state.placeBubblePressed = true;
+            state.useItemPressed = true;
+          });
+        }
       }
     }
 
-    if (e.code === 'Space' && this.gameActive && this.player.state === 'normal') {
+    if (e.code === 'Space' && this.gameActive && this.player && this.player.state === 'normal') {
       this.placeBubble(this.player);
+    }
+
+    if (this.is2PMode && this.player2 && this.gameActive && this.player2.state === 'normal') {
+      if (e.code === 'Enter' || e.code === 'Slash' || e.code === 'NumpadEnter') {
+        this.placeBubble(this.player2);
+      }
     }
   }
 
@@ -1253,7 +1903,7 @@ class Game {
     character.placedCount++;
     
     const allowed = [];
-    const characters = [this.player, ...this.cpus];
+    const characters = this.getCharacters();
     const bubbleLeft = col * TILE_SIZE;
     const bubbleRight = (col + 1) * TILE_SIZE;
     const bubbleTop = row * TILE_SIZE;
@@ -1766,8 +2416,8 @@ class Game {
       }
 
       if (cpu.aiState === 'patrol') {
-        const teammates = [this.player, ...this.cpus].filter(c => c.team === cpu.team && c !== cpu);
-        const enemies = [this.player, ...this.cpus].filter(c => c.team !== cpu.team && c.state !== 'dead');
+        const teammates = this.getCharacters().filter(c => c.team === cpu.team && c !== cpu);
+        const enemies = this.getCharacters().filter(c => c.team !== cpu.team && c.state !== 'dead');
 
         // 1. Check for trapped teammates to rescue
         const trappedTeammate = teammates.find(t => t.state === 'trapped');
@@ -1850,8 +2500,20 @@ class Game {
         if (cpu.movePath.length === 0) {
           if (targetCol === null) {
             // Fallback to player
-            targetCol = Math.floor(this.player.x / TILE_SIZE);
-            targetRow = Math.floor(this.player.y / TILE_SIZE);
+            let fallbackPlayer = this.player;
+            if (this.is2PMode && this.player2 && this.player2.state !== 'dead') {
+              if (this.player.state === 'dead') {
+                fallbackPlayer = this.player2;
+              } else {
+                const dist1 = Math.abs(cpuCol - Math.floor(this.player.x / TILE_SIZE)) + Math.abs(cpuRow - Math.floor(this.player.y / TILE_SIZE));
+                const dist2 = Math.abs(cpuCol - Math.floor(this.player2.x / TILE_SIZE)) + Math.abs(cpuRow - Math.floor(this.player2.y / TILE_SIZE));
+                if (dist2 < dist1) {
+                  fallbackPlayer = this.player2;
+                }
+              }
+            }
+            targetCol = Math.floor(fallbackPlayer.x / TILE_SIZE);
+            targetRow = Math.floor(fallbackPlayer.y / TILE_SIZE);
           }
 
           // Occasionally go for items instead of enemies
@@ -1951,6 +2613,9 @@ class Game {
     this.cappedDelta = Math.min(delta, 3.0);
     const dt = this.cappedDelta / 60;
 
+    // Poll physical gamepads/remotes
+    this.pollGamepads();
+
     // Clear bubble overlap allowance once characters walk off the bubble
     for (const b of this.bubbles) {
       if (b.allowedCharacters && b.allowedCharacters.length > 0) {
@@ -1978,20 +2643,87 @@ class Game {
 
     let playerDx = 0;
     let playerDy = 0;
+    let player2Dx = 0;
+    let player2Dy = 0;
     
     if (!this.gameEnding) {
-      if (this.keys['KeyW'] || this.keys['ArrowUp']) playerDy = -this.player.speed;
-      if (this.keys['KeyS'] || this.keys['ArrowDown']) playerDy = this.player.speed;
-      if (this.keys['KeyA'] || this.keys['ArrowLeft']) playerDx = -this.player.speed;
-      if (this.keys['KeyD'] || this.keys['ArrowRight']) playerDx = this.player.speed;
+      if (this.is2PMode) {
+        // Player 1 keyboard controls
+        if (this.keys['KeyW']) playerDy = -this.player.speed;
+        if (this.keys['KeyS']) playerDy = this.player.speed;
+        if (this.keys['KeyA']) playerDx = -this.player.speed;
+        if (this.keys['KeyD']) playerDx = this.player.speed;
 
-      if (playerDx !== 0 && playerDy !== 0) {
-        playerDx *= 0.7071;
-        playerDy *= 0.7071;
+        // Player 1 Gamepad override
+        if (this.gamepadInputs && this.gamepadInputs[0]) {
+          const gp1 = this.gamepadInputs[0];
+          if (gp1.dx !== 0 || gp1.dy !== 0) {
+            playerDx = gp1.dx * this.player.speed;
+            playerDy = gp1.dy * this.player.speed;
+          }
+        }
+
+        // Player 2 keyboard controls
+        if (this.player2) {
+          if (this.keys['ArrowUp']) player2Dy = -this.player2.speed;
+          if (this.keys['ArrowDown']) player2Dy = this.player2.speed;
+          if (this.keys['ArrowLeft']) player2Dx = -this.player2.speed;
+          if (this.keys['ArrowRight']) player2Dx = this.player2.speed;
+
+          // Player 2 Gamepad override
+          if (this.gamepadInputs && this.gamepadInputs[1]) {
+            const gp2 = this.gamepadInputs[1];
+            if (gp2.dx !== 0 || gp2.dy !== 0) {
+              player2Dx = gp2.dx * this.player2.speed;
+              player2Dy = gp2.dy * this.player2.speed;
+            }
+          }
+        }
+      } else {
+        // Single player mode keyboard controls
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) playerDy = -this.player.speed;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) playerDy = this.player.speed;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) playerDx = -this.player.speed;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) playerDx = this.player.speed;
+
+        // Player 1 Gamepad override
+        if (this.gamepadInputs && this.gamepadInputs[0]) {
+          const gp1 = this.gamepadInputs[0];
+          if (gp1.dx !== 0 || gp1.dy !== 0) {
+            playerDx = gp1.dx * this.player.speed;
+            playerDy = gp1.dy * this.player.speed;
+          }
+        }
+      }
+
+      // Keyboard input normalization (skip if using analog gamepad inputs which are already normalized)
+      if (this.is2PMode) {
+        if (!this.gamepadInputs || !this.gamepadInputs[0] || (this.gamepadInputs[0].dx === 0 && this.gamepadInputs[0].dy === 0)) {
+          if (playerDx !== 0 && playerDy !== 0) {
+            playerDx *= 0.7071;
+            playerDy *= 0.7071;
+          }
+        }
+        if (this.player2 && (!this.gamepadInputs || !this.gamepadInputs[1] || (this.gamepadInputs[1].dx === 0 && this.gamepadInputs[1].dy === 0))) {
+          if (player2Dx !== 0 && player2Dy !== 0) {
+            player2Dx *= 0.7071;
+            player2Dy *= 0.7071;
+          }
+        }
+      } else {
+        if (!this.gamepadInputs || !this.gamepadInputs[0] || (this.gamepadInputs[0].dx === 0 && this.gamepadInputs[0].dy === 0)) {
+          if (playerDx !== 0 && playerDy !== 0) {
+            playerDx *= 0.7071;
+            playerDy *= 0.7071;
+          }
+        }
       }
     }
 
     this.moveCharacter(this.player, playerDx * this.cappedDelta, playerDy * this.cappedDelta);
+    if (this.is2PMode && this.player2) {
+      this.moveCharacter(this.player2, player2Dx * this.cappedDelta, player2Dy * this.cappedDelta);
+    }
 
     if (this.cpus && !this.gameEnding) {
       for (const cpu of this.cpus) {
@@ -2000,6 +2732,9 @@ class Game {
     }
 
     this.updateCharacterStates(this.player, dt);
+    if (this.is2PMode && this.player2) {
+      this.updateCharacterStates(this.player2, dt);
+    }
     if (this.cpus) {
       for (const cpu of this.cpus) {
         this.updateCharacterStates(cpu, dt);
@@ -2098,6 +2833,9 @@ class Game {
     }
 
     this.drawCharacter(this.player);
+    if (this.is2PMode && this.player2) {
+      this.drawCharacter(this.player2);
+    }
     if (this.cpus) {
       for (const cpu of this.cpus) {
         this.drawCharacter(cpu);
@@ -2168,7 +2906,7 @@ class Game {
   }
 
   checkFlameCollision(flame) {
-    const characters = [this.player, ...this.cpus];
+    const characters = this.getCharacters();
     let stateChanged = false;
     for (const char of characters) {
       if (char.state === 'dead' || char.state === 'dying') continue;
@@ -2220,6 +2958,9 @@ class Game {
     if (char.state === 'dead') {
       if (char.countdownText) {
         char.countdownText.visible = false;
+      }
+      if (char.overheadText) {
+        char.overheadText.visible = false;
       }
       return;
     }
@@ -2277,6 +3018,9 @@ class Game {
       if (char.countdownText) {
         char.countdownText.visible = false;
       }
+      if (char.overheadText) {
+        char.overheadText.visible = false;
+      }
       return;
     }
 
@@ -2314,6 +3058,13 @@ class Game {
       g.lineTo(char.x, char.y - char.radius * 1.3 - 16);
       g.endFill();
 
+      // Update overhead 1P/2P label position if exists
+      if (char.overheadText) {
+        char.overheadText.visible = true;
+        char.overheadText.x = char.x;
+        char.overheadText.y = char.y - char.radius * 1.3 - 25;
+      }
+
       // Draw countdown text & prompt above bubble
       if (char.countdownText) {
         char.countdownText.visible = true;
@@ -2324,7 +3075,12 @@ class Game {
         let text = `${secondsLeft}s`;
         if (char.itemSlot === 'needle') {
           if (!char.isCPU) {
-            const selfRescuePrompt = document.body.classList.contains('is-mobile') ? "📍 點 [自救]/畫面自救" : "📍 按 [N]/點擊自救";
+            let selfRescuePrompt = "";
+            if (char === this.player2) {
+              selfRescuePrompt = "📍 按 [M]/點擊自救";
+            } else {
+              selfRescuePrompt = document.body.classList.contains('is-mobile') ? "📍 點 [自救]/畫面自救" : "📍 按 [N]/點擊自救";
+            }
             text += `\n${selfRescuePrompt}`;
           } else {
             text += `\n📍 自救中...`;
@@ -2342,6 +3098,12 @@ class Game {
 
     if (char.countdownText) {
       char.countdownText.visible = false;
+    }
+
+    if (char.overheadText) {
+      char.overheadText.visible = true;
+      char.overheadText.x = char.x;
+      char.overheadText.y = char.y - char.radius - 15;
     }
 
     g.beginFill(0x000000, 0.25);
@@ -2409,7 +3171,7 @@ class Game {
   }
 
   checkGameResolutions() {
-    const chars = [this.player, ...this.cpus];
+    const chars = this.getCharacters();
 
     // 1. Resolve character-to-character collision for Trapped states (Rescue / Kill)
     for (let i = 0; i < chars.length; i++) {
@@ -2503,6 +3265,7 @@ class Game {
     if (reason === 'abort') {
       this.gameScreen.classList.remove('active');
       this.lobbyScreen.classList.add('active');
+      this.resetMenuFocus();
       return;
     }
 
@@ -2532,6 +3295,7 @@ class Game {
     }
 
     this.resultOverlay.classList.add('active');
+    this.resetMenuFocus();
   }
 }
 

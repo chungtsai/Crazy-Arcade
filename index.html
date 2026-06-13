@@ -33,36 +33,85 @@
           </div>
         </div>
 
-        <div class="character-selection">
-          <h3>選擇你的角色</h3>
-          <div class="char-grid">
-            <div class="char-card active" data-char="dao">
-              <div class="char-avatar dao-color"></div>
-              <div class="char-name">藍寶 (Dao)</div>
-              <div class="char-stats">
-                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 60%"></div></div></div>
-                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
-                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
-              </div>
+        <div class="mode-selection">
+          <h3>選擇遊戲模式</h3>
+          <div class="mode-options">
+            <div class="mode-card active" data-mode="1p">
+              <div class="mode-name">單人模式 (1P)</div>
             </div>
-            
-            <div class="char-card" data-char="bazzi">
-              <div class="char-avatar bazzi-color"></div>
-              <div class="char-name">困寶 (Bazzi)</div>
-              <div class="char-stats">
-                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 80%"></div></div></div>
-                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 30%"></div></div></div>
-                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 50%"></div></div></div>
-              </div>
+            <div class="mode-card" data-mode="2p">
+              <div class="mode-name">雙人模式 (2P)</div>
             </div>
+          </div>
+        </div>
 
-            <div class="char-card" data-char="marid">
-              <div class="char-avatar marid-color"></div>
-              <div class="char-name">妮妮 (Marid)</div>
-              <div class="char-stats">
-                <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
-                <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 70%"></div></div></div>
-                <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+        <div class="character-selection">
+          <div class="p1-selection">
+            <h3>選擇角色</h3>
+            <div class="char-grid p1-grid">
+              <div class="char-card active" data-char="dao">
+                <div class="char-avatar dao-color"></div>
+                <div class="char-name">藍寶 (Dao)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 60%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                </div>
+              </div>
+              
+              <div class="char-card" data-char="bazzi">
+                <div class="char-avatar bazzi-color"></div>
+                <div class="char-name">困寶 (Bazzi)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 80%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 30%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 50%"></div></div></div>
+                </div>
+              </div>
+
+              <div class="char-card" data-char="marid">
+                <div class="char-avatar marid-color"></div>
+                <div class="char-name">妮妮 (Marid)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 70%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="p2-selection" style="display: none; margin-top: 1.5rem;">
+            <h3>選擇 2P 角色</h3>
+            <div class="char-grid p2-grid">
+              <div class="char-card" data-char="dao">
+                <div class="char-avatar dao-color"></div>
+                <div class="char-name">藍寶 (Dao)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 60%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                </div>
+              </div>
+              
+              <div class="char-card active" data-char="bazzi">
+                <div class="char-avatar bazzi-color"></div>
+                <div class="char-name">困寶 (Bazzi)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 80%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 30%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 50%"></div></div></div>
+                </div>
+              </div>
+
+              <div class="char-card" data-char="marid">
+                <div class="char-avatar marid-color"></div>
+                <div class="char-name">妮妮 (Marid)</div>
+                <div class="char-stats">
+                  <div class="stat-row"><span>速度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                  <div class="stat-row"><span>水泡數量</span><div class="stat-bar"><div class="bar-fill" style="width: 70%"></div></div></div>
+                  <div class="stat-row"><span>水柱長度</span><div class="stat-bar"><div class="bar-fill" style="width: 40%"></div></div></div>
+                </div>
               </div>
             </div>
           </div>
@@ -92,10 +141,14 @@
 
         <div class="instructions-panel">
           <h4>遊戲控制說明</h4>
-          <div class="controls-guide">
+          <div class="controls-guide" id="controls-guide-1p">
             <div class="control-item"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> <span>/</span> <span class="key">↑</span><span class="key">↓</span><span class="key">←</span><span class="key">→</span> <span>移動角色</span></div>
             <div class="control-item"><span class="key space">Space</span> <span>放置水泡</span></div>
             <div class="control-item"><span class="key">N</span> <span>使用道具 (自救針/飛針)</span></div>
+          </div>
+          <div class="controls-guide" id="controls-guide-2p" style="display: none; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
+            <div class="control-item" style="margin-bottom: 5px;"><strong>1P 玩家：</strong><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> <span>移動</span> | <span class="key space">Space</span> <span>水泡</span> | <span class="key">N</span>/`F`/`E` <span>道具</span></div>
+            <div class="control-item"><strong>2P 玩家：</strong><span class="key">↑</span><span class="key">↓</span><span class="key">←</span><span class="key">→</span> <span>移動</span> | <span class="key space">Enter</span>/`/` <span>水泡</span> | <span class="key">M</span>/`.`/`R-Shift` <span>道具</span></div>
           </div>
         </div>
       </div>
@@ -104,17 +157,30 @@
     <!-- Main Game Screen -->
     <div id="game-screen" class="screen">
       <div class="game-header glass-panel">
-        <div class="player-info-container">
-          <div class="player-profile">
+        <div class="player-info-container" id="players-hud-container" style="display: flex; gap: 20px;">
+          <div class="player-profile" id="player1-hud">
             <div class="profile-avatar dao-color" id="player-hud-avatar"></div>
             <div class="profile-details">
-              <div class="profile-name">Player (Dao)</div>
+              <div class="profile-name">Player 1 (Dao)</div>
               <div class="hud-item-stats">
                 <span class="hud-stat" id="hud-p-bubble">🎈 1/1</span>
                 <span class="hud-stat" id="hud-p-len">📏 2</span>
                 <span class="hud-stat" id="hud-p-speed">⚡ 2.5</span>
                 <span class="hud-stat hud-item-slot" id="hud-p-item">🎒</span>
                 <span class="hud-stat hud-item-slot" id="hud-p-pet">🐱</span>
+              </div>
+            </div>
+          </div>
+          <div class="player-profile" id="player2-hud" style="display: none; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 20px;">
+            <div class="profile-avatar bazzi-color" id="player2-hud-avatar"></div>
+            <div class="profile-details">
+              <div class="profile-name">Player 2 (Bazzi)</div>
+              <div class="hud-item-stats">
+                <span class="hud-stat" id="hud-p2-bubble">🎈 1/1</span>
+                <span class="hud-stat" id="hud-p2-len">📏 2</span>
+                <span class="hud-stat" id="hud-p2-speed">⚡ 3.2</span>
+                <span class="hud-stat hud-item-slot" id="hud-p2-item">🎒</span>
+                <span class="hud-stat hud-item-slot" id="hud-p2-pet">🐱</span>
               </div>
             </div>
           </div>

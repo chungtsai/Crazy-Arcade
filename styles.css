@@ -72,6 +72,35 @@ body {
   z-index: 10;
 }
 
+/* Lobby screen scaling and scrolling on PC/desktop */
+#lobby-screen {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 2.5rem 1rem;
+}
+
+/* Custom Scrollbar for Lobby */
+#lobby-screen::-webkit-scrollbar {
+  width: 8px;
+}
+
+#lobby-screen::-webkit-scrollbar-track {
+  background: rgba(10, 25, 50, 0.3);
+}
+
+#lobby-screen::-webkit-scrollbar-thumb {
+  background: rgba(0, 210, 255, 0.3);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 210, 255, 0.1);
+}
+
+#lobby-screen::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 255, 0.6);
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.5);
+}
+
 /* Lobby / Start Screen UI */
 .main-menu {
   width: 580px;
@@ -80,16 +109,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  margin: auto;
 }
 
 .game-title {
-  font-size: 3.5rem;
+  font-size: 1.8rem;
   font-weight: 800;
-  letter-spacing: 4px;
+  letter-spacing: 2px;
   background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-pink) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   text-shadow: 0 0 40px rgba(0, 210, 255, 0.3);
+  margin-bottom: 0.25rem;
 }
 
 .animate-title {
@@ -106,10 +137,10 @@ body {
 }
 
 .sub-title {
-  font-size: 1.25rem;
+  font-size: 0.85rem;
   font-weight: 400;
   color: var(--accent-blue);
-  margin-top: -1.5rem;
+  margin-top: 0;
   letter-spacing: 2px;
 }
 
@@ -410,10 +441,6 @@ body {
   gap: 1rem;
 }
 
-.player-profile.cpu {
-  text-align: right;
-}
-
 .profile-avatar {
   width: 48px;
   height: 48px;
@@ -566,9 +593,24 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 180, 255, 0.05);
+  
+  /* Sizing to ensure it doesn't overflow the viewport */
+  width: 720px;
+  max-width: 95vw;
+  height: auto;
+  aspect-ratio: 720 / 624;
+  max-height: calc(100vh - 180px);
 }
 
 #pixi-canvas-container {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#pixi-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
   display: block;
 }
 
@@ -763,6 +805,62 @@ body {
   color: var(--text-light);
 }
 
+/* Mode Selection Styles */
+.mode-selection {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.mode-selection h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+  letter-spacing: 1px;
+}
+
+.mode-options {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.mode-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 140px;
+}
+
+.mode-card:hover {
+  border-color: rgba(0, 210, 255, 0.4);
+  background: rgba(0, 210, 255, 0.03);
+}
+
+.mode-card.active {
+  border-color: var(--accent-blue);
+  background: rgba(0, 210, 255, 0.08);
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+}
+
+.mode-card .mode-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-light);
+}
+
+.mode-card.active .mode-name {
+  color: #fff;
+}
+
 /* CPU Selection Styles */
 .cpu-selection {
   margin-top: 1rem;
@@ -879,9 +977,9 @@ body {
 
 .team-slot-card .team-toggle-btn {
   font-family: var(--font-family);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: bold;
-  padding: 0.3rem 0.6rem;
+  padding: 0.45rem 0.8rem;
   border-radius: 6px;
   cursor: pointer;
   border: none;
@@ -890,30 +988,60 @@ body {
 }
 
 .team-toggle-btn.team-red {
-  background: rgba(255, 50, 50, 0.2);
-  border: 1px solid rgba(255, 50, 50, 0.6);
-  color: #ff8080;
+  background: rgba(255, 50, 50, 0.85);
+  border: 1px solid rgba(255, 50, 50, 1);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 10px rgba(255, 50, 50, 0.25);
 }
 
 .team-toggle-btn.team-red:hover:not(:disabled) {
-  background: rgba(255, 50, 50, 0.35);
+  background: rgba(255, 50, 50, 1);
+  box-shadow: 0 0 15px rgba(255, 50, 50, 0.45);
 }
 
 .team-toggle-btn.team-red:disabled {
-  background: rgba(255, 50, 50, 0.15);
-  border-color: rgba(255, 50, 50, 0.3);
-  color: rgba(255, 128, 128, 0.6);
+  background: rgba(255, 50, 50, 0.65);
+  border-color: rgba(255, 50, 50, 0.85);
+  color: rgba(255, 255, 255, 0.9);
   cursor: default;
 }
 
 .team-toggle-btn.team-blue {
-  background: rgba(50, 100, 255, 0.2);
-  border: 1px solid rgba(50, 100, 255, 0.6);
-  color: #809fff;
+  background: rgba(50, 100, 255, 0.85);
+  border: 1px solid rgba(50, 100, 255, 1);
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 10px rgba(50, 100, 255, 0.25);
 }
 
 .team-toggle-btn.team-blue:hover {
-  background: rgba(50, 100, 255, 0.35);
+  background: rgba(50, 100, 255, 1);
+  box-shadow: 0 0 15px rgba(50, 100, 255, 0.45);
+}
+
+.team-slot-card.team-red {
+  border-color: rgba(255, 50, 50, 0.45);
+  background: rgba(255, 50, 50, 0.08);
+  box-shadow: 0 0 12px rgba(255, 50, 50, 0.15);
+}
+
+.team-slot-card.team-red:hover {
+  border-color: rgba(255, 50, 50, 0.8);
+  background: rgba(255, 50, 50, 0.15);
+  box-shadow: 0 0 18px rgba(255, 50, 50, 0.3);
+}
+
+.team-slot-card.team-blue {
+  border-color: rgba(50, 100, 255, 0.45);
+  background: rgba(50, 100, 255, 0.08);
+  box-shadow: 0 0 12px rgba(50, 100, 255, 0.15);
+}
+
+.team-slot-card.team-blue:hover {
+  border-color: rgba(50, 100, 255, 0.8);
+  background: rgba(50, 100, 255, 0.15);
+  box-shadow: 0 0 18px rgba(50, 100, 255, 0.3);
 }
 
 /* Player profile team highlights in HUD */
@@ -921,35 +1049,70 @@ body {
   border-left: 4px solid #ff4d4d;
   padding-left: 8px;
 }
-.player-profile.cpu.team-red {
-  border-left: none;
-  border-right: 4px solid #ff4d4d;
-  padding-left: 0;
-  padding-right: 8px;
-}
 .player-profile.team-blue {
   border-left: 4px solid #4d4dff;
   padding-left: 8px;
 }
-.player-profile.cpu.team-blue {
-  border-left: none;
-  border-right: 4px solid #4d4dff;
-  padding-left: 0;
-  padding-right: 8px;
-}
 
-/* CPU HUD and profiles list */
+/* CPU HUD (Team remaining count HUD) */
 .cpu-info {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: flex-end;
-  max-height: 220px;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-.player-profile.cpu .hud-item-stats {
-  display: none !important; /* Hide stats/items for CPU on all screens */
+.team-remaining-hud {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.45rem 1rem;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
+}
+
+.team-hud-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.team-hud-badge.team-red {
+  color: #ff8080;
+}
+
+.team-hud-badge.team-blue {
+  color: #809fff;
+}
+
+.team-hud-badge .team-count-val {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.15rem 0.6rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: monospace;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.team-hud-badge.team-red .team-count-val {
+  border-color: rgba(255, 50, 50, 0.3);
+  color: #ffb3b3;
+}
+
+.team-hud-badge.team-blue .team-count-val {
+  border-color: rgba(50, 100, 255, 0.3);
+  color: #cce0ff;
+}
+
+.team-hud-separator {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .player-profile.eliminated {
@@ -1057,14 +1220,14 @@ body.is-mobile .title-container {
 }
 
 body.is-mobile .game-title {
-  font-size: 2.2rem;
+  font-size: 1.8rem;
   letter-spacing: 2px;
   margin-bottom: 0.25rem;
 }
 
 body.is-mobile .sub-title {
   margin-top: 0;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 body.is-mobile .map-selection {
@@ -1180,8 +1343,8 @@ body.is-mobile .team-slot-card .slot-name {
 }
 
 body.is-mobile .team-slot-card .team-toggle-btn {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
 }
 
 /* Game screen scaling - Portrait */
@@ -1259,27 +1422,24 @@ body.is-mobile .modal-title {
 
 body.is-mobile #cpu-hud-container {
   flex-direction: row !important;
-  gap: 0.35rem;
   max-height: none;
   align-items: center;
 }
 
-body.is-mobile #cpu-hud-container .player-profile.cpu {
-  text-align: left;
-  flex-direction: row-reverse;
-  gap: 0;
-  border: none;
-  background: none;
+body.is-mobile .team-remaining-hud {
+  padding: 0.3rem 0.6rem;
+  gap: 0.6rem;
+  border-radius: 8px;
 }
 
-body.is-mobile #cpu-hud-container .player-profile.cpu .profile-details {
-  display: none !important; /* Hide details/stats for CPU to fit space */
+body.is-mobile .team-hud-badge {
+  font-size: 0.8rem;
+  gap: 0.3rem;
 }
 
-body.is-mobile #cpu-hud-container .player-profile.cpu .profile-avatar {
-  width: 26px;
-  height: 26px;
-  border-width: 1.5px;
+body.is-mobile .team-hud-badge .team-count-val {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.85rem;
 }
 
 /* Canvas Scaling - Portrait */
@@ -2007,5 +2167,55 @@ body.is-mobile #result-title {
     justify-content: center;
     gap: 12px;
   }
+}
+
+/* Toast Notification Style */
+.toast-notification {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 210, 255, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Noto Sans TC', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  z-index: 9999;
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+}
+
+.toast-notification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.toast-notification.gamepad-connect {
+  border-color: rgba(59, 140, 76, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(59, 140, 76, 0.15);
+}
+
+.toast-notification.gamepad-disconnect {
+  border-color: rgba(224, 86, 56, 0.5);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(224, 86, 56, 0.15);
+}
+
+/* Gamepad focused elements highlight */
+.gamepad-focused {
+  outline: 3px solid var(--accent-blue) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.5) !important;
+  transform: scale(1.03) !important;
+  transition: all 0.2s ease-in-out !important;
 }
 
