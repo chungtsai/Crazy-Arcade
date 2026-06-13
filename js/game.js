@@ -1737,6 +1737,7 @@ class Game {
       const item = this.items[itemIndex];
       this.collectItem(char, item);
       this.itemContainer.removeChild(item.graphics);
+      item.graphics.destroy({ children: true });
       this.items.splice(itemIndex, 1);
     }
   }
@@ -1836,63 +1837,41 @@ class Game {
     const y = item.row * TILE_SIZE + TILE_SIZE / 2;
     const scale = 1 + 0.08 * Math.sin(item.pulsePhase);
     
+    // Translucent outer bubble
     g.beginFill(0xffffff, 0.2);
-    g.drawCircle(x, y, (TILE_SIZE * 0.35) * scale);
+    g.drawCircle(x, y, (TILE_SIZE * 0.38) * scale);
     g.endFill();
 
     g.lineStyle(1.5, 0xffffff, 0.6);
-    g.drawCircle(x, y, (TILE_SIZE * 0.3) * scale);
+    g.drawCircle(x, y, (TILE_SIZE * 0.35) * scale);
     g.lineStyle(0);
 
-    let color = 0x00d2ff;
-    if (item.type === ITEM_TYPES.BUBBLE_UP) color = 0xff007f;
-    if (item.type === ITEM_TYPES.LENGTH_UP) color = 0xffe66d;
-    if (item.type === ITEM_TYPES.SPEED_UP) color = 0x00ffaa;
-    if (item.type === ITEM_TYPES.NEEDLE) color = 0xffffff;
-    if (item.type === ITEM_TYPES.DART) color = 0xffa500; // Orange
-    if (item.type === ITEM_TYPES.PET) color = 0xff66cc; // Pink
-
-    g.beginFill(color);
-    g.drawCircle(x, y - 2, 8 * scale);
+    // Inner highlight for glass effect
+    g.beginFill(0xffffff, 0.08);
+    g.drawCircle(x - 2 * scale, y - 2 * scale, (TILE_SIZE * 0.28) * scale);
     g.endFill();
 
-    if (item.type === ITEM_TYPES.BUBBLE_UP) {
-      g.beginFill(color);
-      g.drawPolygon([x - 2, y + 6, x + 2, y + 6, x, y + 10]);
-      g.endFill();
-    } else if (item.type === ITEM_TYPES.SPEED_UP) {
-      g.beginFill(0x000000);
-      g.drawPolygon([x - 3, y - 2, x + 2, y - 5, x, y + 2, x + 3, y + 2, x - 2, y + 7, x - 1, y]);
-      g.endFill();
-    } else if (item.type === ITEM_TYPES.NEEDLE) {
-      // Draw syringe needle shape
-      g.lineStyle(1.5, 0x333333, 1);
-      g.moveTo(x - 3, y + 3);
-      g.lineTo(x + 3, y - 3);
-      g.moveTo(x + 1, y - 1);
-      g.lineTo(x + 4, y - 4);
-      g.lineStyle(0);
-    } else if (item.type === ITEM_TYPES.DART) {
-      // Draw dart feathers and shaft
-      g.beginFill(0xffffff);
-      g.drawPolygon([x - 3, y + 3, x - 5, y + 5, x - 2, y + 5]);
-      g.drawPolygon([x + 3, y + 3, x + 5, y + 5, x + 2, y + 5]);
-      g.endFill();
-      g.lineStyle(1.5, 0xff0000);
-      g.moveTo(x, y + 4);
-      g.lineTo(x, y - 5);
-      g.lineStyle(0);
-    } else if (item.type === ITEM_TYPES.PET) {
-      // Draw cute pet face shape (ears)
-      g.beginFill(color);
-      g.drawCircle(x - 4, y - 7, 2.5);
-      g.drawCircle(x + 4, y - 7, 2.5);
-      g.endFill();
-      g.beginFill(0xffffff);
-      g.drawCircle(x - 4, y - 7, 1.0);
-      g.drawCircle(x + 4, y - 7, 1.0);
-      g.endFill();
+    if (!item.textChild) {
+      let emoji = '❓';
+      if (item.type === ITEM_TYPES.BUBBLE_UP) emoji = '🎈';
+      else if (item.type === ITEM_TYPES.LENGTH_UP) emoji = '📏';
+      else if (item.type === ITEM_TYPES.SPEED_UP) emoji = '⚡';
+      else if (item.type === ITEM_TYPES.NEEDLE) emoji = '📍';
+      else if (item.type === ITEM_TYPES.DART) emoji = '🎯';
+      else if (item.type === ITEM_TYPES.PET) emoji = '🐱';
+
+      const style = new PIXI.TextStyle({
+        fontSize: 22,
+        align: 'center'
+      });
+      item.textChild = new PIXI.Text(emoji, style);
+      item.textChild.anchor.set(0.5);
+      g.addChild(item.textChild);
     }
+
+    item.textChild.x = x;
+    item.textChild.y = y;
+    item.textChild.scale.set(scale);
   }
 
   addFlame(col, row) {
@@ -1909,7 +1888,9 @@ class Game {
 
     const itemIndex = this.items.findIndex(it => it.col === col && it.row === row);
     if (itemIndex !== -1) {
-      this.itemContainer.removeChild(this.items[itemIndex].graphics);
+      const item = this.items[itemIndex];
+      this.itemContainer.removeChild(item.graphics);
+      item.graphics.destroy({ children: true });
       this.items.splice(itemIndex, 1);
     }
   }
