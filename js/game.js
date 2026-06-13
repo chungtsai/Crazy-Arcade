@@ -75,7 +75,11 @@ class Game {
   }
 
   getCharacters() {
-    return this.is2PMode && this.player2 ? [this.player, this.player2, ...this.cpus] : [this.player, ...this.cpus];
+    const list = [this.player];
+    if (this.player2) list.push(this.player2);
+    if (this.player3) list.push(this.player3);
+    if (this.player4) list.push(this.player4);
+    return [...list, ...this.cpus];
   }
 
   handleGamepadConnected(e) {
@@ -563,11 +567,9 @@ class Game {
     document.getElementById('start-btn').addEventListener('click', () => {
       sfx.playClick();
       if (this.isNetMode) {
-        if (this.netRole === 'p1' && this.netPlayerCount === 2) {
+        if (this.netRole === 'p1' && this.netPlayerCount >= 2) {
           this.sendNetMessage({
             type: 'start_game',
-            selectedCharP1: this.selectedChar,
-            selectedCharP2: this.selectedChar2 || 'bazzi',
             selectedMap: this.selectedMap
           });
         }
@@ -646,8 +648,6 @@ class Game {
         if (this.netRole === 'p1') {
           this.sendNetMessage({
             type: 'start_game',
-            selectedCharP1: this.selectedChar,
-            selectedCharP2: this.selectedChar2 || 'bazzi',
             selectedMap: this.selectedMap
           });
         }
@@ -673,6 +673,31 @@ class Game {
     const container = document.getElementById('team-slots');
     if (!container) return;
     container.innerHTML = '';
+
+    if (this.isNetMode) {
+      // Net mode lobby slots based on connected roles
+      const roles = this.netRolesInRoom || [];
+      roles.forEach(role => {
+        const charKey = (this.netSelectedChars && this.netSelectedChars[role]) || (role === 'p2' ? 'bazzi' : (role === 'p3' ? 'marid' : 'dao'));
+        const team = (role === 'p1' || role === 'p3') ? 'red' : 'blue';
+        const teamLabel = team === 'red' ? '紅隊' : '藍隊';
+        const teamClass = team === 'red' ? 'team-red' : 'team-blue';
+        const charName = CHARACTER_CONFIGS[charKey] ? CHARACTER_CONFIGS[charKey].name : charKey;
+        
+        const isLocal = role === this.netRole;
+        const slotLabel = role.toUpperCase() + (isLocal ? ' (你)' : '');
+
+        const playerCard = document.createElement('div');
+        playerCard.className = `team-slot-card ${teamClass}`;
+        playerCard.innerHTML = `
+          <div class="slot-avatar ${charKey}-color"></div>
+          <div class="slot-name">${slotLabel} (${charName})</div>
+          <button class="team-toggle-btn ${teamClass}" disabled>${teamLabel}</button>
+        `;
+        container.appendChild(playerCard);
+      });
+      return;
+    }
 
     // 1. Add Player 1 Slot
     const playerCard = document.createElement('div');
@@ -876,7 +901,9 @@ class Game {
         case 'joined':
           this.netRole = data.role;
           this.netRoomCode = data.roomCode;
-          this.showToast(`🎉 已成功加入房間！您的身分為: ${this.netRole === 'p1' ? '紅隊 (P1 主機)' : '藍隊 (P2 客戶端)'}`);
+          if (!this.netSelectedChars) this.netSelectedChars = {};
+          this.netSelectedChars[this.netRole] = this.selectedChar;
+          this.showToast(`🎉 已成功加入房間！您的身分為: ${this.netRole.toUpperCase()}`);
           this.updateNetLobbyStartBtn();
           
           this.sendNetMessage({
@@ -894,11 +921,12 @@ class Game {
             roomInfo.style.display = 'block';
             roomInfo.innerHTML = `
               <div>房間：${this.netRoomCode}</div>
-              <div>連線玩家數：${this.netPlayerCount} / 2</div>
-              <div>狀態：${this.netPlayerCount === 2 ? '👥 玩家已到齊，可以開始遊戲！' : '⌛ 等待其他玩家加入...'}</div>
+              <div>連線玩家數：${this.netPlayerCount} / 4</div>
+              <div>狀態：${this.netPlayerCount >= 2 ? '👥 隨時可以開始遊戲！' : '⌛ 等待其他玩家加入...'}</div>
             `;
           }
           this.updateNetLobbyStartBtn();
+          this.updateTeamSlotsUI();
           break;
 
         case 'error':
@@ -907,46 +935,47 @@ class Game {
           break;
 
         case 'player_disconnected':
-          this.showToast(`⚠️ 對手玩家 (${data.role === 'p1' ? '紅隊' : '藍隊'}) 已離開房間`);
+          this.showToast(`⚠️ 玩家 (${data.role.toUpperCase()}) 已離開房間`);
           if (this.gameActive) {
             this.endGame(null, 'abort');
           }
-          this.netPlayerCount = 1;
-          this.updateNetLobbyStartBtn();
           break;
 
         case 'select_char':
-          this.selectedChar2 = data.char;
+          if (!this.netSelectedChars) this.netSelectedChars = {};
+          this.netSelectedChars[data.role] = data.char;
           this.updateTeamSlotsUI();
           break;
 
         case 'start_game':
-          this.selectedChar = this.netRole === 'p1' ? data.selectedCharP1 : data.selectedCharP2;
-          this.selectedChar2 = this.netRole === 'p1' ? data.selectedCharP2 : data.selectedCharP1;
+          this.netSelectedChars = data.selectedChars || {};
           this.selectedMap = data.selectedMap;
           this.is2PMode = true; 
           this.startGame();
           break;
 
         case 'move':
-          if (this.player2) {
-            this.player2.x = data.x;
-            this.player2.y = data.y;
-            this.player2.dirX = data.dirX;
-            this.player2.dirY = data.dirY;
-            this.player2.state = data.state;
+          const mPlayer = this.netPlayersMap[data.role];
+          if (mPlayer) {
+            mPlayer.x = data.x;
+            mPlayer.y = data.y;
+            mPlayer.dirX = data.dirX;
+            mPlayer.dirY = data.dirY;
+            mPlayer.state = data.state;
           }
           break;
 
         case 'place_bubble':
-          if (this.player2) {
-            this.placeBubble(this.player2);
+          const pbPlayer = this.netPlayersMap[data.role];
+          if (pbPlayer) {
+            this.placeBubble(pbPlayer);
           }
           break;
 
         case 'use_item':
-          if (this.player2) {
-            this.useActiveItem(this.player2);
+          const uiPlayer = this.netPlayersMap[data.role];
+          if (uiPlayer) {
+            this.useActiveItem(uiPlayer);
           }
           break;
 
@@ -955,11 +984,12 @@ class Game {
           break;
 
         case 'collect_item':
-          if (this.player2) {
+          const ciPlayer = this.netPlayersMap[data.role];
+          if (ciPlayer) {
             const itemIndex = this.items.findIndex(it => it.col === data.col && it.row === data.row);
             if (itemIndex !== -1) {
               const item = this.items[itemIndex];
-              this.collectItem(this.player2, item);
+              this.collectItem(ciPlayer, item);
               this.itemContainer.removeChild(item.graphics);
               item.graphics.destroy({ children: true });
               this.items.splice(itemIndex, 1);
@@ -989,14 +1019,14 @@ class Game {
     }
 
     if (this.netRole === 'p1') {
-      if (this.netPlayerCount === 2) {
+      if (this.netPlayerCount >= 2) {
         startBtn.disabled = false;
-        startBtn.textContent = '開始遊戲 (2人已連線)';
+        startBtn.textContent = `開始遊戲 (${this.netPlayerCount}人已連線)`;
       } else {
         startBtn.disabled = true;
         startBtn.textContent = '等待對手加入 (1/2)...';
       }
-    } else if (this.netRole === 'p2') {
+    } else if (this.netRole) {
       startBtn.disabled = true;
       startBtn.textContent = '等待主機開始遊戲...';
     } else {
@@ -1325,9 +1355,9 @@ class Game {
 
     this.backgroundContainer = new PIXI.Container();
     this.mapContainer = new PIXI.Container();
-    this.flameContainer = new PIXI.Container();
     this.itemContainer = new PIXI.Container();
     this.bubbleContainer = new PIXI.Container();
+    this.flameContainer = new PIXI.Container();
     this.characterContainer = new PIXI.Container();
 
     this.app.stage.addChild(this.backgroundContainer);
@@ -1339,12 +1369,42 @@ class Game {
 
     this.drawBackground();
     this.drawMap();
+    const localCharKey = this.isNetMode ? (this.netSelectedChars[this.netRole] || 'dao') : this.selectedChar;
+    const config = CHARACTER_CONFIGS[localCharKey];
+    
+    let localX, localY, localDirY, localTeam;
+    if (this.isNetMode) {
+      if (this.netRole === 'p1') {
+        localX = TILE_SIZE * 0.5 + 2;
+        localY = TILE_SIZE * 0.5 + 2;
+        localDirY = 1;
+        localTeam = 'red';
+      } else if (this.netRole === 'p2') {
+        localX = TILE_SIZE * 0.5 + 2;
+        localY = GAME_HEIGHT - TILE_SIZE * 0.5 - 2;
+        localDirY = -1;
+        localTeam = 'blue';
+      } else if (this.netRole === 'p3') {
+        localX = GAME_WIDTH - TILE_SIZE * 0.5 - 2;
+        localY = GAME_HEIGHT - TILE_SIZE * 0.5 - 2;
+        localDirY = -1;
+        localTeam = 'red';
+      } else if (this.netRole === 'p4') {
+        localX = GAME_WIDTH - TILE_SIZE * 0.5 - 2;
+        localY = TILE_SIZE * 0.5 + 2;
+        localDirY = 1;
+        localTeam = 'blue';
+      }
+    } else {
+      localX = TILE_SIZE * 0.5 + 2;
+      localY = TILE_SIZE * 0.5 + 2;
+      localDirY = 1;
+      localTeam = 'red';
+    }
 
-    const config = CHARACTER_CONFIGS[this.selectedChar];
-    const isP2Role = this.isNetMode && this.netRole === 'p2';
     this.player = {
-      x: TILE_SIZE * 0.5 + 2,
-      y: isP2Role ? (GAME_HEIGHT - TILE_SIZE * 0.5 - 2) : (TILE_SIZE * 0.5 + 2),
+      x: localX,
+      y: localY,
       radius: TILE_SIZE * 0.38,
       speed: config.speed,
       maxBubbles: config.maxBubbles,
@@ -1359,8 +1419,8 @@ class Game {
       graphics: new PIXI.Graphics(),
       placedCount: 0,
       dirX: 0,
-      dirY: isP2Role ? -1 : 1,
-      team: isP2Role ? 'blue' : 'red'
+      dirY: localDirY,
+      team: localTeam
     };
 
     this.characterContainer.addChild(this.player.graphics);
@@ -1388,7 +1448,7 @@ class Game {
       strokeThickness: 3,
       align: 'center'
     });
-    this.player.overheadText = new PIXI.Text(isP2Role ? '2P' : '1P', overheadStyle1);
+    this.player.overheadText = new PIXI.Text(this.isNetMode ? this.netRole.toUpperCase() : '1P', overheadStyle1);
     this.player.overheadText.anchor.set(0.5, 1);
     this.characterContainer.addChild(this.player.overheadText);
 
@@ -1404,11 +1464,119 @@ class Game {
       this.useActiveItem(this.player);
     });
 
-    if (this.is2PMode) {
+    this.player2 = null;
+    this.player3 = null;
+    this.player4 = null;
+    this.netPlayersMap = {};
+    this.netPlayersMap[this.netRole] = this.player;
+
+    const spawnRemotePlayer = (role, idx) => {
+      const charKey = this.netSelectedChars[role] || 'bazzi';
+      const conf = CHARACTER_CONFIGS[charKey];
+      
+      let spawnX, spawnY, spawnDirY, spawnTeam;
+      if (role === 'p1') {
+        spawnX = TILE_SIZE * 0.5 + 2;
+        spawnY = TILE_SIZE * 0.5 + 2;
+        spawnDirY = 1;
+        spawnTeam = 'red';
+      } else if (role === 'p2') {
+        spawnX = TILE_SIZE * 0.5 + 2;
+        spawnY = GAME_HEIGHT - TILE_SIZE * 0.5 - 2;
+        spawnDirY = -1;
+        spawnTeam = 'blue';
+      } else if (role === 'p3') {
+        spawnX = GAME_WIDTH - TILE_SIZE * 0.5 - 2;
+        spawnY = GAME_HEIGHT - TILE_SIZE * 0.5 - 2;
+        spawnDirY = -1;
+        spawnTeam = 'red';
+      } else if (role === 'p4') {
+        spawnX = GAME_WIDTH - TILE_SIZE * 0.5 - 2;
+        spawnY = TILE_SIZE * 0.5 + 2;
+        spawnDirY = 1;
+        spawnTeam = 'blue';
+      }
+
+      const pObj = {
+        role: role,
+        x: spawnX,
+        y: spawnY,
+        radius: TILE_SIZE * 0.38,
+        speed: conf.speed,
+        maxBubbles: conf.maxBubbles,
+        bubbleLength: conf.maxLen,
+        itemSlot: null,
+        hasPet: false,
+        color: conf.color,
+        faceColor: conf.faceColor,
+        isCPU: false,
+        state: 'normal',
+        trapTimer: 0,
+        graphics: new PIXI.Graphics(),
+        placedCount: 0,
+        dirX: 0,
+        dirY: spawnDirY,
+        team: spawnTeam
+      };
+
+      this.characterContainer.addChild(pObj.graphics);
+
+      const pStyle = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: '#ffffff',
+        stroke: spawnTeam === 'red' ? '#ff3333' : '#3333ff',
+        strokeThickness: 3.5,
+        align: 'center'
+      });
+      pObj.countdownText = new PIXI.Text('', pStyle);
+      pObj.countdownText.anchor.set(0.5);
+      pObj.countdownText.visible = false;
+      this.characterContainer.addChild(pObj.countdownText);
+
+      const overheadStyle = new PIXI.TextStyle({
+        fontFamily: 'Outfit',
+        fontSize: 12,
+        fontWeight: '900',
+        fill: '#ffffff',
+        stroke: spawnTeam === 'red' ? '#ff3333' : '#3333ff',
+        strokeThickness: 3,
+        align: 'center'
+      });
+      pObj.overheadText = new PIXI.Text(role.toUpperCase(), overheadStyle);
+      pObj.overheadText.anchor.set(0.5, 1);
+      this.characterContainer.addChild(pObj.overheadText);
+
+      pObj.countdownText.interactive = true;
+      pObj.countdownText.cursor = 'pointer';
+      pObj.countdownText.on('pointerdown', () => {
+        this.useActiveItem(pObj);
+      });
+
+      pObj.graphics.interactive = true;
+      pObj.graphics.cursor = 'pointer';
+      pObj.graphics.on('pointerdown', () => {
+        this.useActiveItem(pObj);
+      });
+
+      return pObj;
+    };
+
+    if (this.isNetMode) {
+      const remoteRoles = (this.netRolesInRoom || []).filter(r => r !== this.netRole);
+      remoteRoles.forEach((role, idx) => {
+        const pObj = spawnRemotePlayer(role, idx);
+        if (idx === 0) this.player2 = pObj;
+        else if (idx === 1) this.player3 = pObj;
+        else if (idx === 2) this.player4 = pObj;
+        this.netPlayersMap[role] = pObj;
+      });
+    } else if (this.is2PMode) {
       const config2 = CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'];
       this.player2 = {
         x: TILE_SIZE * 0.5 + 2,
-        y: isP2Role ? (TILE_SIZE * 0.5 + 2) : (GAME_HEIGHT - TILE_SIZE * 0.5 - 2),
+        y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2,
         radius: TILE_SIZE * 0.38,
         speed: config2.speed,
         maxBubbles: config2.maxBubbles,
@@ -1423,8 +1591,8 @@ class Game {
         graphics: new PIXI.Graphics(),
         placedCount: 0,
         dirX: 0,
-        dirY: isP2Role ? 1 : -1,
-        team: this.isNetMode ? (this.netRole === 'p2' ? 'red' : 'blue') : (this.player2Team || 'red')
+        dirY: -1,
+        team: this.player2Team || 'red'
       };
 
       this.characterContainer.addChild(this.player2.graphics);
@@ -1452,7 +1620,7 @@ class Game {
         strokeThickness: 3,
         align: 'center'
       });
-      this.player2.overheadText = new PIXI.Text(this.isNetMode ? (this.netRole === 'p2' ? '1P' : '2P') : '2P', overheadStyle2);
+      this.player2.overheadText = new PIXI.Text('2P', overheadStyle2);
       this.player2.overheadText.anchor.set(0.5, 1);
       this.characterContainer.addChild(this.player2.overheadText);
 
@@ -1467,8 +1635,6 @@ class Game {
       this.player2.graphics.on('pointerdown', () => {
         this.useActiveItem(this.player2);
       });
-    } else {
-      this.player2 = null;
     }
 
     const player1HudEl = document.getElementById('player1-hud');
@@ -1476,8 +1642,8 @@ class Game {
       player1HudEl.className = 'player-profile team-red';
       const nameEl = player1HudEl.querySelector('.profile-name');
       if (nameEl) {
-        const redCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netRole === 'p2' ? this.selectedChar2 : this.selectedChar) : this.selectedChar].name;
-        nameEl.innerHTML = `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${redCharName}`;
+        const redCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netSelectedChars[this.netRole] || 'dao') : this.selectedChar].name;
+        nameEl.innerHTML = this.isNetMode ? `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${this.netRole.toUpperCase()} (${redCharName})` : `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${redCharName}`;
       }
     }
 
@@ -1490,8 +1656,8 @@ class Game {
         player2HudEl.className = `player-profile team-${this.player2.team}`;
         const nameEl = player2HudEl.querySelector('.profile-name');
         if (nameEl) {
-          const blueCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netRole === 'p2' ? this.selectedChar : this.selectedChar2) : (this.selectedChar2 || 'bazzi')].name;
-          nameEl.innerHTML = `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${blueCharName}`;
+          const blueCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netSelectedChars[this.player2.role] || 'bazzi') : (this.selectedChar2 || 'bazzi')].name;
+          nameEl.innerHTML = this.isNetMode ? `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${this.player2.role.toUpperCase()} (${blueCharName})` : `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${blueCharName}`;
         }
       } else {
         player2HudEl.style.display = 'none';
@@ -1609,128 +1775,30 @@ class Game {
   updateHUD() {
     if (!this.player) return;
 
-    // In LAN Multi, map players to HUD slots based on their actual team color
-    let redPlayer = this.player;
-    let bluePlayer = this.player2;
-    let redChar = this.selectedChar;
-    let blueChar = this.selectedChar2 || 'bazzi';
+    let p1Obj = null;
+    let p2Obj = null;
+    let p3Obj = null;
+    let p4Obj = null;
 
-    if (this.isNetMode && this.netRole === 'p2') {
-      redPlayer = this.player2;
-      bluePlayer = this.player;
-      redChar = this.selectedChar2 || 'bazzi';
-      blueChar = this.selectedChar;
+    if (this.isNetMode) {
+      p1Obj = this.netPlayersMap['p1'];
+      p2Obj = this.netPlayersMap['p2'];
+      p3Obj = this.netPlayersMap['p3'];
+      p4Obj = this.netPlayersMap['p4'];
+    } else {
+      p1Obj = this.player;
+      p2Obj = this.player2;
     }
 
-    // Update Player 1 HUD (Red Team)
-    if (redPlayer) {
-      document.getElementById('hud-p-bubble').textContent = `🎈 ${redPlayer.placedCount}/${redPlayer.maxBubbles}`;
-      document.getElementById('hud-p-len').textContent = `📏 ${redPlayer.bubbleLength}`;
-      document.getElementById('hud-p-speed').textContent = `⚡ ${redPlayer.speed.toFixed(1)}`;
-      
-      const itemEl = document.getElementById('hud-p-item');
-      if (itemEl) {
-        let itemText = '🎒';
-        itemEl.classList.remove('has-item');
-        if (redPlayer.itemSlot === 'needle') {
-          itemText = '📍';
-          itemEl.classList.add('has-item');
-        } else if (redPlayer.itemSlot === 'dart') {
-          itemText = '🎯';
-          itemEl.classList.add('has-item');
-        }
-        itemEl.textContent = itemText;
-      }
-      
-      const pPetEl = document.getElementById('hud-p-pet');
-      if (pPetEl) {
-        let petText = '🐱';
-        if (redPlayer.hasPet === 'fast_turtle') petText = '🐢💨';
-        else if (redPlayer.hasPet === 'slow_turtle') petText = '🐢💤';
-        pPetEl.textContent = petText;
-        pPetEl.classList.toggle('has-pet', !!redPlayer.hasPet);
-      }
+    const p1Char = this.isNetMode ? (this.netSelectedChars['p1'] || 'dao') : this.selectedChar;
+    const p2Char = this.isNetMode ? (this.netSelectedChars['p2'] || 'bazzi') : (this.selectedChar2 || 'bazzi');
+    const p3Char = this.isNetMode ? (this.netSelectedChars['p3'] || 'marid') : 'marid';
+    const p4Char = this.isNetMode ? (this.netSelectedChars['p4'] || 'dao') : 'dao';
 
-      const pAvatar = document.getElementById('player-hud-avatar');
-      if (pAvatar) {
-        pAvatar.className = 'profile-avatar';
-        pAvatar.classList.add(redChar === 'dao' ? 'dao-color' : (redChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
-      }
-
-      const playerProfileEl = document.getElementById('player1-hud');
-      if (playerProfileEl) {
-        playerProfileEl.className = 'player-profile team-red';
-        if (redPlayer.state === 'dead' || redPlayer.state === 'dying') {
-          playerProfileEl.classList.add('eliminated');
-        } else {
-          playerProfileEl.classList.remove('eliminated');
-        }
-        const nameEl = playerProfileEl.querySelector('.profile-name');
-        if (nameEl) {
-          const charName = CHARACTER_CONFIGS[redChar] ? CHARACTER_CONFIGS[redChar].name : '藍寶';
-          nameEl.innerHTML = this.isNetMode ? `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> P1 (${charName})` : `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${charName}`;
-        }
-      }
-
-      if (redPlayer === this.player) {
-        this.updateMobileHUD(redPlayer);
-      }
-    }
-
-    // Update Player 2 HUD (Blue Team)
-    if (this.is2PMode && bluePlayer) {
-      document.getElementById('hud-p2-bubble').textContent = `🎈 ${bluePlayer.placedCount}/${bluePlayer.maxBubbles}`;
-      document.getElementById('hud-p2-len').textContent = `📏 ${bluePlayer.bubbleLength}`;
-      document.getElementById('hud-p2-speed').textContent = `⚡ ${bluePlayer.speed.toFixed(1)}`;
-      
-      const itemEl = document.getElementById('hud-p2-item');
-      if (itemEl) {
-        let itemText = '🎒';
-        itemEl.classList.remove('has-item');
-        if (bluePlayer.itemSlot === 'needle') {
-          itemText = '📍';
-          itemEl.classList.add('has-item');
-        } else if (bluePlayer.itemSlot === 'dart') {
-          itemText = '🎯';
-          itemEl.classList.add('has-item');
-        }
-        itemEl.textContent = itemText;
-      }
-      
-      const pPetEl = document.getElementById('hud-p2-pet');
-      if (pPetEl) {
-        let petText = '🐱';
-        if (bluePlayer.hasPet === 'fast_turtle') petText = '🐢💨';
-        else if (bluePlayer.hasPet === 'slow_turtle') petText = '🐢💤';
-        pPetEl.textContent = petText;
-        pPetEl.classList.toggle('has-pet', !!bluePlayer.hasPet);
-      }
-
-      const pAvatar = document.getElementById('player2-hud-avatar');
-      if (pAvatar) {
-        pAvatar.className = 'profile-avatar';
-        pAvatar.classList.add(blueChar === 'dao' ? 'dao-color' : (blueChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
-      }
-
-      const player2ProfileEl = document.getElementById('player2-hud');
-      if (player2ProfileEl) {
-        player2ProfileEl.className = 'player-profile team-blue';
-        if (bluePlayer.state === 'dead' || bluePlayer.state === 'dying') {
-          player2ProfileEl.classList.add('eliminated');
-        } else {
-          player2ProfileEl.classList.remove('eliminated');
-        }
-        const nameEl = player2ProfileEl.querySelector('.profile-name');
-        if (nameEl) {
-          const charName = CHARACTER_CONFIGS[blueChar] ? CHARACTER_CONFIGS[blueChar].name : '困寶';
-          nameEl.innerHTML = this.isNetMode ? `<span style="color: #809fff; font-weight: bold;">[藍隊]</span> P2 (${charName})` : `<span style="color: #809fff; font-weight: bold;">[藍隊]</span> ${charName}`;
-        }
-      }
-
-      if (bluePlayer === this.player) {
-        this.updateMobileHUD(bluePlayer);
-      }
-    }
+    this.updateSinglePlayerHUD(p1Obj, 'player1', 'hud-p', p1Char, '#ff8080', '紅隊', 'P1');
+    this.updateSinglePlayerHUD(p2Obj, 'player2', 'hud-p2', p2Char, '#809fff', '藍隊', 'P2');
+    this.updateSinglePlayerHUD(p3Obj, 'player3', 'hud-p3', p3Char, '#ff8080', '紅隊', 'P3');
+    this.updateSinglePlayerHUD(p4Obj, 'player4', 'hud-p4', p4Char, '#809fff', '藍隊', 'P4');
 
     const chars = this.getCharacters();
     const redAlive = chars.filter(c => c.team === 'red' && c.state !== 'dead' && c.state !== 'dying').length;
@@ -1740,6 +1808,70 @@ class Game {
     const blueAliveEl = document.getElementById('hud-blue-alive-count');
     if (redAliveEl) redAliveEl.textContent = redAlive;
     if (blueAliveEl) blueAliveEl.textContent = blueAlive;
+  }
+
+  updateSinglePlayerHUD(playerObj, prefix, statsPrefix, charKey, teamColor, teamText, label) {
+    const bubbleEl = document.getElementById(`${statsPrefix}-bubble`);
+    const lenEl = document.getElementById(`${statsPrefix}-len`);
+    const speedEl = document.getElementById(`${statsPrefix}-speed`);
+    const itemEl = document.getElementById(`${statsPrefix}-item`);
+    const petEl = document.getElementById(`${statsPrefix}-pet`);
+    const avatarEl = document.getElementById(prefix === 'player1' ? 'player-hud-avatar' : `${prefix}-hud-avatar`);
+    const profileEl = document.getElementById(`${prefix}-hud`);
+
+    if (!playerObj) {
+      if (profileEl) profileEl.style.display = 'none';
+      return;
+    }
+
+    if (profileEl) profileEl.style.display = 'flex';
+    if (bubbleEl) bubbleEl.textContent = `🎈 ${playerObj.placedCount}/${playerObj.maxBubbles}`;
+    if (lenEl) lenEl.textContent = `📏 ${playerObj.bubbleLength}`;
+    if (speedEl) speedEl.textContent = `⚡ ${playerObj.speed.toFixed(1)}`;
+
+    if (itemEl) {
+      let itemText = '🎒';
+      itemEl.classList.remove('has-item');
+      if (playerObj.itemSlot === 'needle') {
+        itemText = '📍';
+        itemEl.classList.add('has-item');
+      } else if (playerObj.itemSlot === 'dart') {
+        itemText = '🎯';
+        itemEl.classList.add('has-item');
+      }
+      itemEl.textContent = itemText;
+    }
+
+    if (petEl) {
+      let petText = '🐱';
+      if (playerObj.hasPet === 'fast_turtle') petText = '🐢💨';
+      else if (playerObj.hasPet === 'slow_turtle') petText = '🐢💤';
+      petEl.textContent = petText;
+      petEl.classList.toggle('has-pet', !!playerObj.hasPet);
+    }
+
+    if (avatarEl) {
+      avatarEl.className = 'profile-avatar';
+      avatarEl.classList.add(charKey === 'dao' ? 'dao-color' : (charKey === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+    }
+
+    if (profileEl) {
+      profileEl.className = `player-profile team-${playerObj.team}`;
+      if (playerObj.state === 'dead' || playerObj.state === 'dying') {
+        profileEl.classList.add('eliminated');
+      } else {
+        profileEl.classList.remove('eliminated');
+      }
+      const nameEl = profileEl.querySelector('.profile-name');
+      if (nameEl) {
+        const charName = CHARACTER_CONFIGS[charKey] ? CHARACTER_CONFIGS[charKey].name : charKey;
+        nameEl.innerHTML = `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${label} (${charName})`;
+      }
+    }
+
+    if (playerObj === this.player) {
+      this.updateMobileHUD(playerObj);
+    }
   }
 
   updateMobileHUD(localPlayer) {
@@ -2250,7 +2382,7 @@ class Game {
     if (itemTypeOverride !== undefined) {
       chosenType = itemTypeOverride;
     } else {
-      if (this.isNetMode && this.netRole === 'p2') {
+      if (this.isNetMode && this.netRole !== 'p1') {
         return; // Client waits for host to sync item
       }
       if (Math.random() < 0.4) {
@@ -2895,8 +3027,14 @@ class Game {
     }
 
     this.updateCharacterStates(this.player, dt);
-    if (this.is2PMode && this.player2) {
+    if (this.player2) {
       this.updateCharacterStates(this.player2, dt);
+    }
+    if (this.player3) {
+      this.updateCharacterStates(this.player3, dt);
+    }
+    if (this.player4) {
+      this.updateCharacterStates(this.player4, dt);
     }
     if (this.cpus) {
       for (const cpu of this.cpus) {

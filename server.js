@@ -80,12 +80,12 @@ wss.on('connection', (ws) => {
       if (data.type === 'join_lobby') {
         let roomCode = 'default_room';
         if (!rooms[roomCode]) {
-          rooms[roomCode] = { players: [], state: 'lobby' };
+          rooms[roomCode] = { players: [], state: 'lobby', selectedChars: {} };
         }
         
         const room = rooms[roomCode];
         
-        if (room.players.length >= 2) {
+        if (room.players.length >= 4) {
           ws.send(JSON.stringify({ type: 'error', message: '房間已滿，請稍後再試。' }));
           return;
         }
@@ -93,7 +93,16 @@ wss.on('connection', (ws) => {
         ws.roomCode = roomCode;
         room.players.push(ws);
         
-        ws.role = room.players.length === 1 ? 'p1' : 'p2';
+        // Find the first available role from p1, p2, p3, p4
+        const existingRoles = room.players.map(p => p.role).filter(Boolean);
+        let role = 'p1';
+        for (let i = 1; i <= 4; i++) {
+          if (!existingRoles.includes('p' + i)) {
+            role = 'p' + i;
+            break;
+          }
+        }
+        ws.role = role;
         ws.playerId = ws.role;
 
         // Send confirmation back
@@ -112,21 +121,43 @@ wss.on('connection', (ws) => {
         });
       }
       
+      else if (data.type === 'select_char') {
+        if (ws.roomCode && rooms[ws.roomCode]) {
+          const room = rooms[ws.roomCode];
+          if (!room.selectedChars) room.selectedChars = {};
+          room.selectedChars[ws.role] = data.char;
+          
+          // Relay character selection to other players with sender info
+          data.role = ws.role;
+          broadcastToRoom(ws.roomCode, data, ws);
+        }
+      }
+      
       else if (data.type === 'start_game') {
         if (ws.roomCode && rooms[ws.roomCode] && ws.role === 'p1') {
-          rooms[ws.roomCode].state = 'playing';
+          const room = rooms[ws.roomCode];
+          room.state = 'playing';
+          
+          // Ensure all players have a selected character
+          if (!room.selectedChars) room.selectedChars = {};
+          room.players.forEach(p => {
+            if (!room.selectedChars[p.role]) {
+              room.selectedChars[p.role] = 'dao'; // default fallback
+            }
+          });
+
           broadcastToRoom(ws.roomCode, {
             type: 'start_game',
-            selectedCharP1: data.selectedCharP1,
-            selectedCharP2: data.selectedCharP2,
+            selectedChars: room.selectedChars,
             selectedMap: data.selectedMap
           });
         }
       }
 
       else {
-        // Relay message to other player in the same room
+        // Relay message to other players in the same room with sender's role
         if (ws.roomCode && rooms[ws.roomCode]) {
+          data.role = ws.role;
           broadcastToRoom(ws.roomCode, data, ws);
         }
       }
@@ -139,6 +170,9 @@ wss.on('connection', (ws) => {
     if (ws.roomCode && rooms[ws.roomCode]) {
       const room = rooms[ws.roomCode];
       room.players = room.players.filter(p => p !== ws);
+      if (room.selectedChars) {
+        delete room.selectedChars[ws.role];
+      }
       
       if (room.players.length === 0) {
         delete rooms[ws.roomCode];
@@ -147,6 +181,12 @@ wss.on('connection', (ws) => {
         broadcastToRoom(ws.roomCode, {
           type: 'player_disconnected',
           role: ws.role
+        });
+        // Broadcast updated room status
+        broadcastToRoom(ws.roomCode, {
+          type: 'room_status',
+          playerCount: room.players.length,
+          roles: room.players.map(p => p.role)
         });
         room.state = 'lobby';
       }
