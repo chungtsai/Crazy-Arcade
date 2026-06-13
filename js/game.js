@@ -30,6 +30,15 @@ class Game {
     this.cratesDestroyedCount = 0;
     this.gameStartTime = 0;
 
+    // Network properties for LAN Multi Mode
+    this.isNetMode = false;
+    this.socket = null;
+    this.netRole = null; 
+    this.netRoomCode = null;
+    this.netPlayerCount = 0;
+    this.netRolesInRoom = [];
+    this.lastSentState = null;
+
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     window.addEventListener('keyup', this.handleKeyUp.bind(this));
     window.addEventListener('gamepadconnected', this.handleGamepadConnected.bind(this));
@@ -445,22 +454,48 @@ class Game {
         modeCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         this.is2PMode = card.dataset.mode === '2p';
+        this.isNetMode = card.dataset.mode === 'net';
 
         // Toggle character selection headers and Player 2 selection visibility
         const p2Sel = document.querySelector('.p2-selection');
         const p1Title = document.querySelector('.p1-selection h3');
         const guide1p = document.getElementById('controls-guide-1p');
         const guide2p = document.getElementById('controls-guide-2p');
-        if (this.is2PMode) {
-          if (p2Sel) p2Sel.style.display = 'block';
-          if (p1Title) p1Title.textContent = '選擇 1P 角色';
-          if (guide1p) guide1p.style.display = 'none';
-          if (guide2p) guide2p.style.display = 'block';
-        } else {
+        const cpuSel = document.querySelector('.cpu-selection');
+        const teamSel = document.querySelector('.team-selection');
+        const netPanel = document.getElementById('net-setup-panel');
+        const startBtn = document.getElementById('start-btn');
+
+        if (this.isNetMode) {
+          this.is2PMode = false;
           if (p2Sel) p2Sel.style.display = 'none';
-          if (p1Title) p1Title.textContent = '選擇角色';
+          if (p1Title) p1Title.textContent = '選擇您的角色';
           if (guide1p) guide1p.style.display = 'block';
           if (guide2p) guide2p.style.display = 'none';
+          if (cpuSel) cpuSel.style.display = 'none';
+          if (teamSel) teamSel.style.display = 'none';
+          if (netPanel) netPanel.style.display = 'block';
+          this.cpuCount = 0;
+          this.updateNetLobbyStartBtn();
+          this.initNetSetup();
+        } else {
+          if (p2Sel) p2Sel.style.display = this.is2PMode ? 'block' : 'none';
+          if (p1Title) p1Title.textContent = this.is2PMode ? '選擇 1P 角色' : '選擇角色';
+          if (guide1p) guide1p.style.display = this.is2PMode ? 'none' : 'block';
+          if (guide2p) guide2p.style.display = this.is2PMode ? 'block' : 'none';
+          if (cpuSel) cpuSel.style.display = 'block';
+          if (teamSel) teamSel.style.display = 'block';
+          if (netPanel) netPanel.style.display = 'none';
+
+          // Restore cpuCount from the active CPU buttons
+          const activeCpuBtn = document.querySelector('.cpu-opt-btn.active');
+          this.cpuCount = activeCpuBtn ? parseInt(activeCpuBtn.dataset.cpu, 10) : 3;
+
+          if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = '開始遊戲';
+          }
+          this.disconnectNet();
         }
 
         this.updateTeamSlotsUI();
@@ -475,6 +510,13 @@ class Game {
         card.classList.add('active');
         this.selectedChar = card.dataset.char;
         this.updateTeamSlotsUI();
+
+        if (this.isNetMode) {
+          this.sendNetMessage({
+            type: 'select_char',
+            char: this.selectedChar
+          });
+        }
       });
     });
 
@@ -520,13 +562,28 @@ class Game {
 
     document.getElementById('start-btn').addEventListener('click', () => {
       sfx.playClick();
-      this.startGame();
+      if (this.isNetMode) {
+        if (this.netRole === 'p1' && this.netPlayerCount === 2) {
+          this.sendNetMessage({
+            type: 'start_game',
+            selectedCharP1: this.selectedChar,
+            selectedCharP2: this.selectedChar2 || 'bazzi',
+            selectedMap: this.selectedMap
+          });
+        }
+      } else {
+        this.startGame();
+      }
     });
 
     // Menu button triggers pause modal
     if (this.menuBtn) {
       this.menuBtn.addEventListener('click', () => {
         sfx.playClick();
+        if (this.isNetMode) {
+          this.showToast('ℹ️ 區域連線模式下無法暫停遊戲');
+          return;
+        }
         if (this.gameActive && !this.gameEnding) {
           this.gameActive = false;
           if (this.pauseModal) {
@@ -547,11 +604,9 @@ class Game {
           this.pauseModal.classList.remove('active');
         }
         this.clearMenuFocus();
-        // Clear focus so keypresses don't keep triggering button click
         if (document.activeElement) {
           document.activeElement.blur();
         }
-        // Sync gamepad states to prevent input propagation on resume
         if (this.prevGamepadStates) {
           this.prevGamepadStates.forEach(state => {
             state.placeBubblePressed = true;
@@ -587,8 +642,19 @@ class Game {
 
     document.getElementById('play-again-btn').addEventListener('click', () => {
       sfx.playClick();
-      this.clearMenuFocus();
-      this.restartGame();
+      if (this.isNetMode) {
+        if (this.netRole === 'p1') {
+          this.sendNetMessage({
+            type: 'start_game',
+            selectedCharP1: this.selectedChar,
+            selectedCharP2: this.selectedChar2 || 'bazzi',
+            selectedMap: this.selectedMap
+          });
+        }
+      } else {
+        this.clearMenuFocus();
+        this.restartGame();
+      }
     });
 
     document.getElementById('result-exit-btn').addEventListener('click', () => {
@@ -673,6 +739,269 @@ class Game {
       });
 
       container.appendChild(cpuCard);
+    }
+  }
+
+  // Network Multi-player helper methods
+  initNetSetup() {
+    const serverIpInput = document.getElementById('net-server-ip');
+    const connectBtn = document.getElementById('net-connect-btn');
+    const statusText = document.getElementById('net-status-text');
+    const roomInfo = document.getElementById('net-room-info');
+
+    if (serverIpInput && !serverIpInput.value) {
+      if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        serverIpInput.value = `ws://${window.location.host}`;
+      } else {
+        serverIpInput.value = 'ws://localhost:3000';
+      }
+    }
+
+    if (connectBtn && !connectBtn.hasListener) {
+      connectBtn.hasListener = true;
+      connectBtn.addEventListener('click', () => {
+        sfx.playClick();
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.disconnectNet();
+        } else {
+          const url = serverIpInput.value.trim();
+          this.connectNet(url);
+        }
+      });
+    }
+  }
+
+  connectNet(url) {
+    const statusText = document.getElementById('net-status-text');
+    const connectBtn = document.getElementById('net-connect-btn');
+    const roomInfo = document.getElementById('net-room-info');
+
+    if (statusText) {
+      statusText.textContent = '● 連線中...';
+      statusText.style.color = '#ffaa00';
+    }
+
+    try {
+      this.socket = new WebSocket(url);
+      
+      this.socket.onopen = () => {
+        if (statusText) {
+          statusText.textContent = '● 已連線';
+          statusText.style.color = '#4dff4d';
+        }
+        if (connectBtn) {
+          connectBtn.textContent = '中斷連線';
+        }
+        
+        this.sendNetMessage({
+          type: 'join_lobby'
+        });
+      };
+
+      this.socket.onmessage = (e) => {
+        this.handleNetMessage(e.data);
+      };
+
+      this.socket.onclose = (event) => {
+        this.handleNetDisconnect();
+      };
+
+      this.socket.onerror = (err) => {
+        console.error('Socket error:', err);
+        if (statusText) {
+          statusText.textContent = '● 連線失敗';
+          statusText.style.color = '#ff6b6b';
+        }
+      };
+    } catch (e) {
+      console.error(e);
+      if (statusText) {
+        statusText.textContent = '● 網址錯誤';
+        statusText.style.color = '#ff6b6b';
+      }
+    }
+  }
+
+  disconnectNet() {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+    this.handleNetDisconnect();
+  }
+
+  handleNetDisconnect() {
+    this.socket = null;
+    this.netRole = null;
+    this.netRoomCode = null;
+    this.netPlayerCount = 0;
+    this.netRolesInRoom = [];
+    this.lastSentState = null;
+
+    const statusText = document.getElementById('net-status-text');
+    const connectBtn = document.getElementById('net-connect-btn');
+    const roomInfo = document.getElementById('net-room-info');
+
+    if (statusText) {
+      statusText.textContent = '● 未連線';
+      statusText.style.color = '#ff6b6b';
+    }
+    if (connectBtn) {
+      connectBtn.textContent = '連線';
+    }
+    if (roomInfo) {
+      roomInfo.style.display = 'none';
+      roomInfo.textContent = '';
+    }
+
+    this.updateNetLobbyStartBtn();
+
+    if (this.gameActive && this.isNetMode) {
+      this.showToast('⚠️ 與伺服器連線已中斷，回到大廳');
+      this.endGame(null, 'abort');
+    }
+  }
+
+  sendNetMessage(data) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(data));
+    }
+  }
+
+  handleNetMessage(messageText) {
+    try {
+      const data = JSON.parse(messageText);
+
+      switch (data.type) {
+        case 'joined':
+          this.netRole = data.role;
+          this.netRoomCode = data.roomCode;
+          this.showToast(`🎉 已成功加入房間！您的身分為: ${this.netRole === 'p1' ? '紅隊 (P1 主機)' : '藍隊 (P2 客戶端)'}`);
+          this.updateNetLobbyStartBtn();
+          
+          this.sendNetMessage({
+            type: 'select_char',
+            char: this.selectedChar
+          });
+          break;
+
+        case 'room_status':
+          this.netPlayerCount = data.playerCount;
+          this.netRolesInRoom = data.roles;
+          
+          const roomInfo = document.getElementById('net-room-info');
+          if (roomInfo) {
+            roomInfo.style.display = 'block';
+            roomInfo.innerHTML = `
+              <div>房間：${this.netRoomCode}</div>
+              <div>連線玩家數：${this.netPlayerCount} / 2</div>
+              <div>狀態：${this.netPlayerCount === 2 ? '👥 玩家已到齊，可以開始遊戲！' : '⌛ 等待其他玩家加入...'}</div>
+            `;
+          }
+          this.updateNetLobbyStartBtn();
+          break;
+
+        case 'error':
+          this.showToast(`❌ 連線錯誤: ${data.message}`);
+          this.disconnectNet();
+          break;
+
+        case 'player_disconnected':
+          this.showToast(`⚠️ 對手玩家 (${data.role === 'p1' ? '紅隊' : '藍隊'}) 已離開房間`);
+          if (this.gameActive) {
+            this.endGame(null, 'abort');
+          }
+          this.netPlayerCount = 1;
+          this.updateNetLobbyStartBtn();
+          break;
+
+        case 'select_char':
+          this.selectedChar2 = data.char;
+          this.updateTeamSlotsUI();
+          break;
+
+        case 'start_game':
+          this.selectedChar = this.netRole === 'p1' ? data.selectedCharP1 : data.selectedCharP2;
+          this.selectedChar2 = this.netRole === 'p1' ? data.selectedCharP2 : data.selectedCharP1;
+          this.selectedMap = data.selectedMap;
+          this.is2PMode = true; 
+          this.startGame();
+          break;
+
+        case 'move':
+          if (this.player2) {
+            this.player2.x = data.x;
+            this.player2.y = data.y;
+            this.player2.dirX = data.dirX;
+            this.player2.dirY = data.dirY;
+            this.player2.state = data.state;
+          }
+          break;
+
+        case 'place_bubble':
+          if (this.player2) {
+            this.placeBubble(this.player2);
+          }
+          break;
+
+        case 'use_item':
+          if (this.player2) {
+            this.useActiveItem(this.player2);
+          }
+          break;
+
+        case 'destroy_crate':
+          this.destroyCrate(data.col, data.row, data.itemType);
+          break;
+
+        case 'collect_item':
+          if (this.player2) {
+            const itemIndex = this.items.findIndex(it => it.col === data.col && it.row === data.row);
+            if (itemIndex !== -1) {
+              const item = this.items[itemIndex];
+              this.collectItem(this.player2, item);
+              this.itemContainer.removeChild(item.graphics);
+              item.graphics.destroy({ children: true });
+              this.items.splice(itemIndex, 1);
+            }
+          }
+          break;
+      }
+    } catch (e) {
+      console.error('Error parsing net message:', e);
+    }
+  }
+
+  updateNetLobbyStartBtn() {
+    const startBtn = document.getElementById('start-btn');
+    if (!startBtn) return;
+
+    if (!this.isNetMode) {
+      startBtn.disabled = false;
+      startBtn.textContent = '開始遊戲';
+      return;
+    }
+
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      startBtn.disabled = true;
+      startBtn.textContent = '請先連線至伺服器';
+      return;
+    }
+
+    if (this.netRole === 'p1') {
+      if (this.netPlayerCount === 2) {
+        startBtn.disabled = false;
+        startBtn.textContent = '開始遊戲 (2人已連線)';
+      } else {
+        startBtn.disabled = true;
+        startBtn.textContent = '等待對手加入 (1/2)...';
+      }
+    } else if (this.netRole === 'p2') {
+      startBtn.disabled = true;
+      startBtn.textContent = '等待主機開始遊戲...';
+    } else {
+      startBtn.disabled = true;
+      startBtn.textContent = '正在加入房間...';
     }
   }
 
@@ -1012,14 +1341,15 @@ class Game {
     this.drawMap();
 
     const config = CHARACTER_CONFIGS[this.selectedChar];
+    const isP2Role = this.isNetMode && this.netRole === 'p2';
     this.player = {
       x: TILE_SIZE * 0.5 + 2,
-      y: TILE_SIZE * 0.5 + 2,
+      y: isP2Role ? (GAME_HEIGHT - TILE_SIZE * 0.5 - 2) : (TILE_SIZE * 0.5 + 2),
       radius: TILE_SIZE * 0.38,
       speed: config.speed,
       maxBubbles: config.maxBubbles,
       bubbleLength: config.maxLen,
-      itemSlot: null, // Holds either 'needle' or 'dart'
+      itemSlot: null,
       hasPet: false,
       color: config.color,
       faceColor: config.faceColor,
@@ -1029,8 +1359,8 @@ class Game {
       graphics: new PIXI.Graphics(),
       placedCount: 0,
       dirX: 0,
-      dirY: 1,
-      team: 'red' // Player is always Red Team
+      dirY: isP2Role ? -1 : 1,
+      team: isP2Role ? 'blue' : 'red'
     };
 
     this.characterContainer.addChild(this.player.graphics);
@@ -1040,7 +1370,7 @@ class Game {
       fontSize: 13,
       fontWeight: 'bold',
       fill: '#ffffff',
-      stroke: '#ff3333',
+      stroke: this.player.team === 'red' ? '#ff3333' : '#3333ff',
       strokeThickness: 3.5,
       align: 'center'
     });
@@ -1049,17 +1379,16 @@ class Game {
     this.player.countdownText.visible = false;
     this.characterContainer.addChild(this.player.countdownText);
 
-    // Overhead 1P label
     const overheadStyle1 = new PIXI.TextStyle({
       fontFamily: 'Outfit',
       fontSize: 12,
       fontWeight: '900',
       fill: '#ffffff',
-      stroke: '#ff3333',
+      stroke: this.player.team === 'red' ? '#ff3333' : '#3333ff',
       strokeThickness: 3,
       align: 'center'
     });
-    this.player.overheadText = new PIXI.Text('1P', overheadStyle1);
+    this.player.overheadText = new PIXI.Text(isP2Role ? '2P' : '1P', overheadStyle1);
     this.player.overheadText.anchor.set(0.5, 1);
     this.characterContainer.addChild(this.player.overheadText);
 
@@ -1075,12 +1404,11 @@ class Game {
       this.useActiveItem(this.player);
     });
 
-    // Initialize Player 2 if in 2P Mode
     if (this.is2PMode) {
       const config2 = CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'];
       this.player2 = {
         x: TILE_SIZE * 0.5 + 2,
-        y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, // Starts at Bottom-Left
+        y: isP2Role ? (TILE_SIZE * 0.5 + 2) : (GAME_HEIGHT - TILE_SIZE * 0.5 - 2),
         radius: TILE_SIZE * 0.38,
         speed: config2.speed,
         maxBubbles: config2.maxBubbles,
@@ -1095,8 +1423,8 @@ class Game {
         graphics: new PIXI.Graphics(),
         placedCount: 0,
         dirX: 0,
-        dirY: -1,
-        team: this.player2Team || 'red'
+        dirY: isP2Role ? 1 : -1,
+        team: this.isNetMode ? (this.netRole === 'p2' ? 'red' : 'blue') : (this.player2Team || 'red')
       };
 
       this.characterContainer.addChild(this.player2.graphics);
@@ -1115,7 +1443,6 @@ class Game {
       this.player2.countdownText.visible = false;
       this.characterContainer.addChild(this.player2.countdownText);
 
-      // Overhead 2P label
       const overheadStyle2 = new PIXI.TextStyle({
         fontFamily: 'Outfit',
         fontSize: 12,
@@ -1125,7 +1452,7 @@ class Game {
         strokeThickness: 3,
         align: 'center'
       });
-      this.player2.overheadText = new PIXI.Text('2P', overheadStyle2);
+      this.player2.overheadText = new PIXI.Text(this.isNetMode ? (this.netRole === 'p2' ? '1P' : '2P') : '2P', overheadStyle2);
       this.player2.overheadText.anchor.set(0.5, 1);
       this.characterContainer.addChild(this.player2.overheadText);
 
@@ -1144,17 +1471,16 @@ class Game {
       this.player2 = null;
     }
 
-    // Apply player 1 HUD team styling
     const player1HudEl = document.getElementById('player1-hud');
     if (player1HudEl) {
       player1HudEl.className = 'player-profile team-red';
       const nameEl = player1HudEl.querySelector('.profile-name');
       if (nameEl) {
-        nameEl.innerHTML = `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${CHARACTER_CONFIGS[this.selectedChar].name}`;
+        const redCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netRole === 'p2' ? this.selectedChar2 : this.selectedChar) : this.selectedChar].name;
+        nameEl.innerHTML = `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${redCharName}`;
       }
     }
 
-    // Setup player 2 HUD visibility and team styling
     const player2HudEl = document.getElementById('player2-hud');
     if (player2HudEl) {
       if (this.is2PMode && this.player2) {
@@ -1164,7 +1490,8 @@ class Game {
         player2HudEl.className = `player-profile team-${this.player2.team}`;
         const nameEl = player2HudEl.querySelector('.profile-name');
         if (nameEl) {
-          nameEl.innerHTML = `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'].name}`;
+          const blueCharName = CHARACTER_CONFIGS[this.isNetMode ? (this.netRole === 'p2' ? this.selectedChar : this.selectedChar2) : (this.selectedChar2 || 'bazzi')].name;
+          nameEl.innerHTML = `<span style="color: ${teamColor}; font-weight: bold;">[${teamText}]</span> ${blueCharName}`;
         }
       } else {
         player2HudEl.style.display = 'none';
@@ -1280,19 +1607,35 @@ class Game {
   }
 
   updateHUD() {
-    if (this.player) {
-      document.getElementById('hud-p-bubble').textContent = `🎈 ${this.player.placedCount}/${this.player.maxBubbles}`;
-      document.getElementById('hud-p-len').textContent = `📏 ${this.player.bubbleLength}`;
-      document.getElementById('hud-p-speed').textContent = `⚡ ${this.player.speed.toFixed(1)}`;
+    if (!this.player) return;
+
+    // In LAN Multi, map players to HUD slots based on their actual team color
+    let redPlayer = this.player;
+    let bluePlayer = this.player2;
+    let redChar = this.selectedChar;
+    let blueChar = this.selectedChar2 || 'bazzi';
+
+    if (this.isNetMode && this.netRole === 'p2') {
+      redPlayer = this.player2;
+      bluePlayer = this.player;
+      redChar = this.selectedChar2 || 'bazzi';
+      blueChar = this.selectedChar;
+    }
+
+    // Update Player 1 HUD (Red Team)
+    if (redPlayer) {
+      document.getElementById('hud-p-bubble').textContent = `🎈 ${redPlayer.placedCount}/${redPlayer.maxBubbles}`;
+      document.getElementById('hud-p-len').textContent = `📏 ${redPlayer.bubbleLength}`;
+      document.getElementById('hud-p-speed').textContent = `⚡ ${redPlayer.speed.toFixed(1)}`;
       
       const itemEl = document.getElementById('hud-p-item');
       if (itemEl) {
         let itemText = '🎒';
         itemEl.classList.remove('has-item');
-        if (this.player.itemSlot === 'needle') {
+        if (redPlayer.itemSlot === 'needle') {
           itemText = '📍';
           itemEl.classList.add('has-item');
-        } else if (this.player.itemSlot === 'dart') {
+        } else if (redPlayer.itemSlot === 'dart') {
           itemText = '🎯';
           itemEl.classList.add('has-item');
         }
@@ -1302,73 +1645,49 @@ class Game {
       const pPetEl = document.getElementById('hud-p-pet');
       if (pPetEl) {
         pPetEl.textContent = '🐱';
-        pPetEl.classList.toggle('has-pet', !!this.player.hasPet);
+        pPetEl.classList.toggle('has-pet', !!redPlayer.hasPet);
       }
 
       const pAvatar = document.getElementById('player-hud-avatar');
       if (pAvatar) {
         pAvatar.className = 'profile-avatar';
-        pAvatar.classList.add(this.selectedChar === 'dao' ? 'dao-color' : (this.selectedChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+        pAvatar.classList.add(redChar === 'dao' ? 'dao-color' : (redChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
       }
 
       const playerProfileEl = document.getElementById('player1-hud');
       if (playerProfileEl) {
-        if (this.player.state === 'dead' || this.player.state === 'dying') {
+        playerProfileEl.className = 'player-profile team-red';
+        if (redPlayer.state === 'dead' || redPlayer.state === 'dying') {
           playerProfileEl.classList.add('eliminated');
         } else {
           playerProfileEl.classList.remove('eliminated');
         }
-      }
-
-      // Update mobile button text and status
-      const needleBtnEmoji = document.getElementById('btn-needle-emoji');
-      const needleBtnLabel = document.getElementById('btn-needle-label');
-      if (needleBtnEmoji && needleBtnLabel) {
-        if (this.player.itemSlot === 'needle') {
-          needleBtnEmoji.textContent = '📍';
-          needleBtnLabel.textContent = '自救針';
-        } else if (this.player.itemSlot === 'dart') {
-          needleBtnEmoji.textContent = '🎯';
-          needleBtnLabel.textContent = '飛針';
-        } else {
-          needleBtnEmoji.textContent = '🎒';
-          needleBtnLabel.textContent = '道具';
+        const nameEl = playerProfileEl.querySelector('.profile-name');
+        if (nameEl) {
+          const charName = CHARACTER_CONFIGS[redChar] ? CHARACTER_CONFIGS[redChar].name : '藍寶';
+          nameEl.innerHTML = this.isNetMode ? `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> P1 (${charName})` : `<span style="color: #ff8080; font-weight: bold;">[紅隊]</span> ${charName}`;
         }
       }
 
-      const needleBtn = document.getElementById('btn-needle');
-      if (needleBtn) {
-        // Toggle dynamic item status classes
-        needleBtn.classList.remove('has-needle', 'has-dart');
-        if (this.player.itemSlot === 'needle') {
-          needleBtn.classList.add('has-needle');
-        } else if (this.player.itemSlot === 'dart') {
-          needleBtn.classList.add('has-dart');
-        }
-
-        const canUseNeedle = this.player.itemSlot === 'needle' && this.player.state === 'trapped';
-        const canUseDart = this.player.itemSlot === 'dart' && this.player.state === 'normal';
-        if (canUseNeedle || canUseDart) {
-          needleBtn.classList.add('can-use');
-        } else {
-          needleBtn.classList.remove('can-use');
-        }
+      if (redPlayer === this.player) {
+        this.updateMobileHUD(redPlayer);
       }
     }
 
-    if (this.is2PMode && this.player2) {
-      document.getElementById('hud-p2-bubble').textContent = `🎈 ${this.player2.placedCount}/${this.player2.maxBubbles}`;
-      document.getElementById('hud-p2-len').textContent = `📏 ${this.player2.bubbleLength}`;
-      document.getElementById('hud-p2-speed').textContent = `⚡ ${this.player2.speed.toFixed(1)}`;
+    // Update Player 2 HUD (Blue Team)
+    if (this.is2PMode && bluePlayer) {
+      document.getElementById('hud-p2-bubble').textContent = `🎈 ${bluePlayer.placedCount}/${bluePlayer.maxBubbles}`;
+      document.getElementById('hud-p2-len').textContent = `📏 ${bluePlayer.bubbleLength}`;
+      document.getElementById('hud-p2-speed').textContent = `⚡ ${bluePlayer.speed.toFixed(1)}`;
       
       const itemEl = document.getElementById('hud-p2-item');
       if (itemEl) {
         let itemText = '🎒';
         itemEl.classList.remove('has-item');
-        if (this.player2.itemSlot === 'needle') {
+        if (bluePlayer.itemSlot === 'needle') {
           itemText = '📍';
           itemEl.classList.add('has-item');
-        } else if (this.player2.itemSlot === 'dart') {
+        } else if (bluePlayer.itemSlot === 'dart') {
           itemText = '🎯';
           itemEl.classList.add('has-item');
         }
@@ -1378,23 +1697,32 @@ class Game {
       const pPetEl = document.getElementById('hud-p2-pet');
       if (pPetEl) {
         pPetEl.textContent = '🐱';
-        pPetEl.classList.toggle('has-pet', !!this.player2.hasPet);
+        pPetEl.classList.toggle('has-pet', !!bluePlayer.hasPet);
       }
 
       const pAvatar = document.getElementById('player2-hud-avatar');
       if (pAvatar) {
-        const char2 = this.selectedChar2 || 'bazzi';
         pAvatar.className = 'profile-avatar';
-        pAvatar.classList.add(char2 === 'dao' ? 'dao-color' : (char2 === 'bazzi' ? 'bazzi-color' : 'marid-color'));
+        pAvatar.classList.add(blueChar === 'dao' ? 'dao-color' : (blueChar === 'bazzi' ? 'bazzi-color' : 'marid-color'));
       }
 
       const player2ProfileEl = document.getElementById('player2-hud');
       if (player2ProfileEl) {
-        if (this.player2.state === 'dead' || this.player2.state === 'dying') {
+        player2ProfileEl.className = 'player-profile team-blue';
+        if (bluePlayer.state === 'dead' || bluePlayer.state === 'dying') {
           player2ProfileEl.classList.add('eliminated');
         } else {
           player2ProfileEl.classList.remove('eliminated');
         }
+        const nameEl = player2ProfileEl.querySelector('.profile-name');
+        if (nameEl) {
+          const charName = CHARACTER_CONFIGS[blueChar] ? CHARACTER_CONFIGS[blueChar].name : '困寶';
+          nameEl.innerHTML = this.isNetMode ? `<span style="color: #809fff; font-weight: bold;">[藍隊]</span> P2 (${charName})` : `<span style="color: #809fff; font-weight: bold;">[藍隊]</span> ${charName}`;
+        }
+      }
+
+      if (bluePlayer === this.player) {
+        this.updateMobileHUD(bluePlayer);
       }
     }
 
@@ -1406,6 +1734,41 @@ class Game {
     const blueAliveEl = document.getElementById('hud-blue-alive-count');
     if (redAliveEl) redAliveEl.textContent = redAlive;
     if (blueAliveEl) blueAliveEl.textContent = blueAlive;
+  }
+
+  updateMobileHUD(localPlayer) {
+    const needleBtnEmoji = document.getElementById('btn-needle-emoji');
+    const needleBtnLabel = document.getElementById('btn-needle-label');
+    if (needleBtnEmoji && needleBtnLabel) {
+      if (localPlayer.itemSlot === 'needle') {
+        needleBtnEmoji.textContent = '📍';
+        needleBtnLabel.textContent = '自救針';
+      } else if (localPlayer.itemSlot === 'dart') {
+        needleBtnEmoji.textContent = '🎯';
+        needleBtnLabel.textContent = '飛針';
+      } else {
+        needleBtnEmoji.textContent = '🎒';
+        needleBtnLabel.textContent = '道具';
+      }
+    }
+
+    const needleBtn = document.getElementById('btn-needle');
+    if (needleBtn) {
+      needleBtn.classList.remove('has-needle', 'has-dart');
+      if (localPlayer.itemSlot === 'needle') {
+        needleBtn.classList.add('has-needle');
+      } else if (localPlayer.itemSlot === 'dart') {
+        needleBtn.classList.add('has-dart');
+      }
+
+      const canUseNeedle = localPlayer.itemSlot === 'needle' && localPlayer.state === 'trapped';
+      const canUseDart = localPlayer.itemSlot === 'dart' && localPlayer.state === 'normal';
+      if (canUseNeedle || canUseDart) {
+        needleBtn.classList.add('can-use');
+      } else {
+        needleBtn.classList.remove('can-use');
+      }
+    }
   }
 
   drawBackground() {
@@ -1506,6 +1869,12 @@ class Game {
         this.dartsProjectiles.push(dart);
       }
     }
+
+    if (this.isNetMode && player === this.player) {
+      this.sendNetMessage({
+        type: 'use_item'
+      });
+    }
   }
 
   handleKeyDown(e) {
@@ -1543,12 +1912,16 @@ class Game {
       this.useActiveItem(this.player);
     }
 
-    // Player 2 use item
-    if (this.is2PMode && this.player2 && (e.code === 'KeyM' || e.code === 'Period' || e.code === 'ShiftRight' || e.code === 'KeyL')) {
+    // Player 2 use item (disabled in net mode as player2 is remote)
+    if (this.is2PMode && this.player2 && !this.isNetMode && (e.code === 'KeyM' || e.code === 'Period' || e.code === 'ShiftRight' || e.code === 'KeyL')) {
       this.useActiveItem(this.player2);
     }
 
     if (e.code === 'Escape') {
+      if (this.isNetMode) {
+        this.showToast('ℹ️ 區域連線模式下無法暫停遊戲');
+        return;
+      }
       if (this.gameActive && !this.gameEnding) {
         sfx.playClick();
         this.gameActive = false;
@@ -1579,7 +1952,8 @@ class Game {
       this.placeBubble(this.player);
     }
 
-    if (this.is2PMode && this.player2 && this.gameActive && this.player2.state === 'normal') {
+    // Player 2 place bubble (disabled in net mode as player2 is remote)
+    if (this.is2PMode && this.player2 && !this.isNetMode && this.gameActive && this.player2.state === 'normal') {
       if (e.code === 'Enter' || e.code === 'Slash' || e.code === 'NumpadEnter') {
         this.placeBubble(this.player2);
       }
@@ -1646,6 +2020,12 @@ class Game {
     this.bubbles.push(bubble);
     sfx.playBubblePlace();
     this.updateHUD();
+
+    if (this.isNetMode && character === this.player) {
+      this.sendNetMessage({
+        type: 'place_bubble'
+      });
+    }
   }
 
   checkTileCollision(rect, char) {
@@ -1739,6 +2119,14 @@ class Game {
       this.itemContainer.removeChild(item.graphics);
       item.graphics.destroy({ children: true });
       this.items.splice(itemIndex, 1);
+
+      if (this.isNetMode && char === this.player) {
+        this.sendNetMessage({
+          type: 'collect_item',
+          col,
+          row
+        });
+      }
     }
   }
 
@@ -1793,29 +2181,53 @@ class Game {
     sfx.playExplosion();
   }
 
-  destroyCrate(col, row) {
+  destroyCrate(col, row, itemTypeOverride = undefined) {
+    if (this.grid[row][col] !== 2) {
+      if (itemTypeOverride !== undefined && itemTypeOverride !== null) {
+        const hasItem = this.items.some(it => it.col === col && it.row === row);
+        if (!hasItem) {
+          const item = {
+            col,
+            row,
+            type: itemTypeOverride,
+            graphics: new PIXI.Graphics(),
+            pulsePhase: 0
+          };
+          this.drawItem(item);
+          this.itemContainer.addChild(item.graphics);
+          this.items.push(item);
+        }
+      }
+      return;
+    }
+
     this.grid[row][col] = 0;
     this.cratesDestroyedCount++;
     this.drawMap();
 
-    if (Math.random() < 0.4) {
-      let chosenType;
-      const rand = Math.random();
-      if (rand < 0.55) {
-        // Standard stats
-        const standardTypes = [ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.SPEED_UP];
-        chosenType = standardTypes[Math.floor(Math.random() * standardTypes.length)];
-      } else if (rand < 0.75) {
-        // Needle
-        chosenType = ITEM_TYPES.NEEDLE;
-      } else if (rand < 0.90) {
-        // Dart
-        chosenType = ITEM_TYPES.DART;
-      } else {
-        // Pet
-        chosenType = ITEM_TYPES.PET;
+    let chosenType = null;
+    if (itemTypeOverride !== undefined) {
+      chosenType = itemTypeOverride;
+    } else {
+      if (this.isNetMode && this.netRole === 'p2') {
+        return; // Client waits for host to sync item
       }
+      if (Math.random() < 0.4) {
+        const rand = Math.random();
+        if (rand < 0.55) {
+          const standardTypes = [ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.SPEED_UP];
+          chosenType = standardTypes[Math.floor(Math.random() * standardTypes.length)];
+        } else if (rand < 0.75) {
+          chosenType = ITEM_TYPES.NEEDLE;
+        } else if (rand < 0.90) {
+          chosenType = ITEM_TYPES.DART;
+        } else {
+          chosenType = ITEM_TYPES.PET;
+        }
+      }
+    }
 
+    if (chosenType !== null) {
       const item = {
         col,
         row,
@@ -1827,6 +2239,15 @@ class Game {
       this.drawItem(item);
       this.itemContainer.addChild(item.graphics);
       this.items.push(item);
+    }
+
+    if (this.isNetMode && this.netRole === 'p1') {
+      this.sendNetMessage({
+        type: 'destroy_crate',
+        col,
+        row,
+        itemType: chosenType
+      });
     }
   }
 
@@ -2329,7 +2750,23 @@ class Game {
     let player2Dy = 0;
     
     if (!this.gameEnding) {
-      if (this.is2PMode) {
+      if (this.isNetMode) {
+        // Network mode: Local player controls (WASD and Arrow keys)
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) playerDy = -this.player.speed;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) playerDy = this.player.speed;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) playerDx = -this.player.speed;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) playerDx = this.player.speed;
+
+        // Local player Gamepad override
+        if (this.gamepadInputs && this.gamepadInputs[0]) {
+          const gp1 = this.gamepadInputs[0];
+          if (gp1.dx !== 0 || gp1.dy !== 0) {
+            playerDx = gp1.dx * this.player.speed;
+            playerDy = gp1.dy * this.player.speed;
+          }
+        }
+        // Player 2 is remote and controlled via network messages; no local keyboard/gamepad overrides
+      } else if (this.is2PMode) {
         // Player 1 keyboard controls
         if (this.keys['KeyW']) playerDy = -this.player.speed;
         if (this.keys['KeyS']) playerDy = this.player.speed;
@@ -2525,6 +2962,31 @@ class Game {
     }
 
     this.checkGameResolutions();
+
+    // Broadcast local player movement & state to remote player
+    if (this.isNetMode && this.player) {
+      const currentState = {
+        x: this.player.x,
+        y: this.player.y,
+        dirX: this.player.dirX,
+        dirY: this.player.dirY,
+        state: this.player.state
+      };
+      
+      if (!this.lastSentState ||
+          this.lastSentState.x !== currentState.x ||
+          this.lastSentState.y !== currentState.y ||
+          this.lastSentState.dirX !== currentState.dirX ||
+          this.lastSentState.dirY !== currentState.dirY ||
+          this.lastSentState.state !== currentState.state) {
+        
+        this.sendNetMessage({
+          type: 'move',
+          ...currentState
+        });
+        this.lastSentState = currentState;
+      }
+    }
   }
 
   updateCharacterStates(char, dt) {
@@ -2962,18 +3424,53 @@ class Game {
     resTime.textContent = `${min}:${sec}`;
     resCrates.textContent = `${this.cratesDestroyedCount} 個`;
 
-    if (outcome === 'win') {
-      title.textContent = '紅隊獲勝!';
-      title.style.color = 'var(--accent-blue)';
-      msg.textContent = '恭喜你！紅隊成功消滅了藍隊所有成員，獲得了最終的勝利！';
-    } else if (outcome === 'lose') {
-      title.textContent = '藍隊獲勝';
-      title.style.color = 'var(--accent-pink)';
-      msg.textContent = '太可惜了！藍隊成功擊敗了紅隊，下次再努力配合隊友贏回來吧！';
+    if (this.isNetMode) {
+      const localWon = (outcome === 'win' && this.player.team === 'red') || (outcome === 'lose' && this.player.team === 'blue');
+      const localLost = (outcome === 'win' && this.player.team === 'blue') || (outcome === 'lose' && this.player.team === 'red');
+      
+      if (localWon) {
+        title.textContent = '您獲勝了！';
+        title.style.color = 'var(--accent-blue)';
+        msg.textContent = '恭喜你！成功擊敗對手，獲得了最終的勝利！';
+      } else if (localLost) {
+        title.textContent = '您戰敗了...';
+        title.style.color = 'var(--accent-pink)';
+        msg.textContent = '太可惜了！對手成功擊敗了你，下次再努力贏回來吧！';
+      } else {
+        title.textContent = '平局';
+        title.style.color = 'var(--text-light)';
+        msg.textContent = '雙方全軍覆沒，平分秋色！';
+      }
+
+      const playAgainBtn = document.getElementById('play-again-btn');
+      if (playAgainBtn) {
+        if (this.netRole === 'p1') {
+          playAgainBtn.disabled = false;
+          playAgainBtn.textContent = '重新開始';
+        } else {
+          playAgainBtn.disabled = true;
+          playAgainBtn.textContent = '等待主機重新開始...';
+        }
+      }
     } else {
-      title.textContent = '平局';
-      title.style.color = 'var(--text-light)';
-      msg.textContent = '雙方全軍覆沒，平分秋色！';
+      if (outcome === 'win') {
+        title.textContent = '紅隊獲勝!';
+        title.style.color = 'var(--accent-blue)';
+        msg.textContent = '恭喜你！紅隊成功消滅了藍隊所有成員，獲得了最終的勝利！';
+      } else if (outcome === 'lose') {
+        title.textContent = '藍隊獲勝';
+        title.style.color = 'var(--accent-pink)';
+        msg.textContent = '太可惜了！藍隊成功擊敗了紅隊，下次再努力配合隊友贏回來吧！';
+      } else {
+        title.textContent = '平局';
+        title.style.color = 'var(--text-light)';
+        msg.textContent = '雙方全軍覆沒，平分秋色！';
+      }
+      const playAgainBtn = document.getElementById('play-again-btn');
+      if (playAgainBtn) {
+        playAgainBtn.disabled = false;
+        playAgainBtn.textContent = '再玩一次';
+      }
     }
 
     this.resultOverlay.classList.add('active');

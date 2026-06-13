@@ -16,9 +16,9 @@ const MAPS_CONFIG = {
       [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
       [2, 2, 0, 1, 2, 2, 2, 0, 2, 2, 2, 1, 0, 2, 2],
       [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
-      [2, 2, 0, 2, 0, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2],
+      [2, 2, 0, 2, 0, 1, 1, 0, 1, 1, 0, 2, 0, 2, 2],
       [2, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 2],
-      [2, 2, 0, 2, 0, 1, 1, 1, 1, 1, 0, 2, 0, 2, 2],
+      [2, 2, 0, 2, 0, 1, 1, 0, 1, 1, 0, 2, 0, 2, 2],
       [2, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2],
       [2, 2, 0, 1, 2, 2, 2, 0, 2, 2, 2, 1, 0, 2, 2],
       [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2],
@@ -76,9 +76,9 @@ const CPU_START_POSITIONS = [
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 0, dirY: -1 }, // Bottom-Right
   { x: GAME_WIDTH - TILE_SIZE * 0.5 - 2, y: TILE_SIZE * 0.5 + 2, dirX: -1, dirY: 0 },              // Top-Right
   { x: TILE_SIZE * 0.5 + 2, y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2, dirX: 1, dirY: 0 },               // Bottom-Left
-  { x: TILE_SIZE * 5, y: TILE_SIZE * 5, dirX: 1, dirY: 0 }, // Center safe spot for Village10
-  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 2.5, dirX: -1, dirY: 0 }, // Top-Middle
-  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 10.5, dirX: 1, dirY: 0 } // Bottom-Middle
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 6.5, dirX: 1, dirY: 0 }, // Center safe spot
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 4.5, dirX: -1, dirY: 0 }, // Top-Middle
+  { x: TILE_SIZE * 7.5, y: TILE_SIZE * 8.5, dirX: 1, dirY: 0 } // Bottom-Middle
 ];
 
 // Items

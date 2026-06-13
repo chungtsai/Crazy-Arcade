@@ -42,6 +42,24 @@
             <div class="mode-card" data-mode="2p">
               <div class="mode-name">雙人模式 (2P)</div>
             </div>
+            <div class="mode-card" data-mode="net">
+              <div class="mode-name">區域連線模式 (LAN Multi)</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="net-setup-panel" class="glass-panel" style="display: none; margin-top: 1rem; margin-bottom: 1rem; padding: 1.2rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; text-align: left;">
+          <h3 style="margin-top: 0; font-size: 1.1rem; color: #4da6ff;">區域網路連線設定</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="net-server-ip" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">伺服器網址：</label>
+              <input type="text" id="net-server-ip" class="glass-input" style="padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.4); color: white; outline: none; font-family: monospace;" placeholder="ws://192.168.x.x:3000">
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button id="net-connect-btn" class="btn secondary" style="padding: 6px 15px; font-size: 14px; margin: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25);">連線</button>
+              <span id="net-status-text" style="font-size: 14px; color: #ff6b6b; font-weight: bold;">● 未連線</span>
+            </div>
+            <div id="net-room-info" style="display: none; font-size: 0.85rem; color: #4da6ff; background: rgba(77, 166, 255, 0.1); padding: 8px; border-radius: 6px; border: 1px solid rgba(77, 166, 255, 0.2);"></div>
           </div>
         </div>
 
