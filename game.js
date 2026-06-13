@@ -968,6 +968,9 @@ class Game {
     }, 1000);
     this.updateTimerDisplay();
 
+    if (this.app) {
+      this.app.ticker.remove(this.update, this);
+    }
     this.app.ticker.add(this.update, this);
   }
 
@@ -1290,6 +1293,7 @@ class Game {
 
     const prevX = char.x;
     const prevY = char.y;
+    const slideSpeed = char.speed * 0.8 * (this.cappedDelta || 1.0);
 
     if (dx !== 0) {
       char.dirX = Math.sign(dx);
@@ -1313,7 +1317,7 @@ class Game {
         const gridY = Math.floor(char.y / TILE_SIZE);
         const offset = char.y - (gridY * TILE_SIZE + TILE_SIZE / 2);
         if (Math.abs(offset) < TILE_SIZE * 0.45) {
-          char.y -= Math.sign(offset) * Math.min(Math.abs(offset), char.speed * 0.8);
+          char.y -= Math.sign(offset) * Math.min(Math.abs(offset), slideSpeed);
         }
         char.x = prevX;
       }
@@ -1333,7 +1337,7 @@ class Game {
         const gridX = Math.floor(char.x / TILE_SIZE);
         const offset = char.x - (gridX * TILE_SIZE + TILE_SIZE / 2);
         if (Math.abs(offset) < TILE_SIZE * 0.45) {
-          char.x -= Math.sign(offset) * Math.min(Math.abs(offset), char.speed * 0.8);
+          char.x -= Math.sign(offset) * Math.min(Math.abs(offset), slideSpeed);
         }
         char.y = prevY;
       }
@@ -1660,30 +1664,32 @@ class Game {
         let dx = 0;
         let dy = 0;
 
+        const stepSpeed = cpu.speed * (this.cappedDelta || 1.0);
+
         if (nextTile.col !== currentTileCol) {
           // Move horizontally, align vertically first
           const currentTileCenterY = currentTileRow * TILE_SIZE + TILE_SIZE / 2;
           const alignDiffY = currentTileCenterY - cpu.y;
           if (Math.abs(alignDiffY) > 2) {
-            dy = Math.sign(alignDiffY) * Math.min(Math.abs(alignDiffY), cpu.speed);
+            dy = Math.sign(alignDiffY) * Math.min(Math.abs(alignDiffY), stepSpeed);
           } else {
             cpu.y = currentTileCenterY; // snap
-            dx = Math.sign(diffX) * Math.min(Math.abs(diffX), cpu.speed);
+            dx = Math.sign(diffX) * Math.min(Math.abs(diffX), stepSpeed);
           }
         } else if (nextTile.row !== currentTileRow) {
           // Move vertically, align horizontally first
           const currentTileCenterX = currentTileCol * TILE_SIZE + TILE_SIZE / 2;
           const alignDiffX = currentTileCenterX - cpu.x;
           if (Math.abs(alignDiffX) > 2) {
-            dx = Math.sign(alignDiffX) * Math.min(Math.abs(alignDiffX), cpu.speed);
+            dx = Math.sign(alignDiffX) * Math.min(Math.abs(alignDiffX), stepSpeed);
           } else {
             cpu.x = currentTileCenterX; // snap
-            dy = Math.sign(diffY) * Math.min(Math.abs(diffY), cpu.speed);
+            dy = Math.sign(diffY) * Math.min(Math.abs(diffY), stepSpeed);
           }
         } else {
           // Same tile, just slight adjustment
-          if (Math.abs(diffX) > 2) dx = Math.sign(diffX) * Math.min(Math.abs(diffX), cpu.speed);
-          if (Math.abs(diffY) > 2) dy = Math.sign(diffY) * Math.min(Math.abs(diffY), cpu.speed);
+          if (Math.abs(diffX) > 2) dx = Math.sign(diffX) * Math.min(Math.abs(diffX), stepSpeed);
+          if (Math.abs(diffY) > 2) dy = Math.sign(diffY) * Math.min(Math.abs(diffY), stepSpeed);
         }
 
         this.moveCharacter(cpu, dx, dy);
@@ -1905,7 +1911,9 @@ class Game {
   update(delta) {
     if (!this.gameActive) return;
 
-    const dt = delta / 60;
+    // Cap delta to prevent massive speed jumps/teleportation during lag spikes or tab sleep
+    this.cappedDelta = Math.min(delta, 3.0);
+    const dt = this.cappedDelta / 60;
 
     // Clear bubble overlap allowance once characters walk off the bubble
     for (const b of this.bubbles) {
@@ -1947,7 +1955,7 @@ class Game {
       }
     }
 
-    this.moveCharacter(this.player, playerDx, playerDy);
+    this.moveCharacter(this.player, playerDx * cappedDelta, playerDy * cappedDelta);
 
     if (this.cpus && !this.gameEnding) {
       for (const cpu of this.cpus) {
