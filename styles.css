@@ -39,6 +39,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
 }
 
 /* Glassmorphism Panel base */
@@ -75,7 +76,7 @@ body {
 /* Lobby screen scaling - restore scrolling for PC, hide scrollbar */
 #lobby-screen {
   width: 100%;
-  height: 100%;
+  max-height: calc(100vh - 4rem);
   overflow-y: auto;
   box-sizing: border-box;
   padding: 2.5rem 1rem;
@@ -595,13 +596,10 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 180, 255, 0.05);
-  
-  /* Sizing to ensure it doesn't overflow the viewport */
-  width: 720px;
-  max-width: 95vw;
-  height: auto;
-  aspect-ratio: 720 / 624;
-  max-height: calc(100vh - 180px);
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
 }
 
 #pixi-canvas-container {
