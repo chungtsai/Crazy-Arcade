@@ -527,7 +527,7 @@ class Game {
             this.placeBubble(this.player);
           }
         } else if (key === 'KeyN') {
-          this.usePlayerNeedle();
+          this.useActiveItem();
         }
         btn.classList.add('active');
       };
