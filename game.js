@@ -363,6 +363,14 @@ class Game {
         mapCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         this.selectedMap = card.dataset.map;
+
+        // Dynamically update the lobby sub-title and document title
+        const mapConf = MAPS_CONFIG[this.selectedMap];
+        const subTitleEl = document.querySelector('.sub-title');
+        if (subTitleEl) {
+          subTitleEl.textContent = `${mapConf.name} 經典關卡`;
+        }
+        document.title = `爆爆王 (Crazy Arcade) - ${mapConf.name}`;
       });
     });
 
@@ -746,6 +754,9 @@ class Game {
     }
 
     const mapConf = MAPS_CONFIG[this.selectedMap];
+    
+    // Dynamically update document title on game start
+    document.title = `爆爆王 (Crazy Arcade) - ${mapConf.name}`;
 
     if (!this.app) {
       this.app = new PIXI.Application({

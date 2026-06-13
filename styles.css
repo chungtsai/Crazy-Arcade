@@ -897,6 +897,10 @@ body {
   justify-content: center;
 }
 
+.player-profile.cpu .hud-item-stats {
+  display: none !important; /* Hide stats/items for CPU on all screens */
+}
+
 .player-profile.eliminated {
   opacity: 0.35;
   filter: grayscale(100%);
