@@ -562,7 +562,13 @@ class Game {
 
     if (!joystickWrapper) return;
 
-    this.mobileControlMode = localStorage.getItem('mobileControlMode') || 'joystick';
+    let storedMode = 'joystick';
+    try {
+      storedMode = localStorage.getItem('mobileControlMode') || 'joystick';
+    } catch (e) {
+      console.warn('localStorage is not available, default to joystick');
+    }
+    this.mobileControlMode = storedMode;
 
     const applyControlMode = () => {
       if (this.mobileControlMode === 'joystick') {
@@ -598,7 +604,11 @@ class Game {
         e.preventDefault();
         sfx.init();
         this.mobileControlMode = this.mobileControlMode === 'joystick' ? 'dpad' : 'joystick';
-        localStorage.setItem('mobileControlMode', this.mobileControlMode);
+        try {
+          localStorage.setItem('mobileControlMode', this.mobileControlMode);
+        } catch (e) {
+          console.warn('localStorage is not available');
+        }
         applyControlMode();
         
         if ('vibrate' in navigator) {
