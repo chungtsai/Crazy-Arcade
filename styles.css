@@ -447,6 +447,7 @@ body {
   display: flex;
   gap: 0.75rem;
   font-size: 0.85rem;
+  align-items: center;
 }
 
 .hud-stat {
@@ -454,6 +455,56 @@ body {
   padding: 0.15rem 0.5rem;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+}
+
+/* Beautiful visual slot design */
+.hud-item-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: rgba(10, 25, 50, 0.4) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  font-size: 1.1rem;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.2) !important;
+  opacity: 0.5;
+}
+
+.hud-item-slot.has-item {
+  opacity: 1;
+  background: rgba(10, 25, 50, 0.75) !important;
+  border: 1.5px solid var(--accent-blue) !important;
+  box-shadow: 
+    0 0 10px rgba(0, 210, 255, 0.35),
+    inset 0 0 6px rgba(0, 210, 255, 0.15) !important;
+  animation: slotGlowCyan 2.5s infinite alternate ease-in-out;
+}
+
+.hud-item-slot.has-pet {
+  opacity: 1;
+  background: rgba(10, 25, 50, 0.75) !important;
+  border: 1.5px solid var(--accent-pink) !important;
+  box-shadow: 
+    0 0 10px rgba(255, 0, 127, 0.35),
+    inset 0 0 6px rgba(255, 0, 127, 0.15) !important;
+  animation: slotGlowPink 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes slotGlowCyan {
+  0% { box-shadow: 0 0 4px rgba(0, 210, 255, 0.15), inset 0 0 4px rgba(0, 210, 255, 0.05); }
+  100% { box-shadow: 0 0 10px rgba(0, 210, 255, 0.45), inset 0 0 8px rgba(0, 210, 255, 0.2); }
+}
+
+@keyframes slotGlowPink {
+  0% { box-shadow: 0 0 4px rgba(255, 0, 127, 0.15), inset 0 0 4px rgba(255, 0, 127, 0.05); }
+  100% { box-shadow: 0 0 10px rgba(255, 0, 127, 0.45), inset 0 0 8px rgba(255, 0, 127, 0.2); }
 }
 
 .timer-container {
@@ -1161,11 +1212,20 @@ body.is-mobile .profile-avatar {
 
 body.is-mobile .hud-item-stats {
   gap: 0.25rem;
+  align-items: center;
 }
 
 body.is-mobile .hud-stat {
   font-size: 0.7rem;
   padding: 0.1rem 0.25rem;
+  height: 20px;
+}
+
+body.is-mobile .hud-item-slot {
+  width: 24px;
+  height: 24px;
+  font-size: 0.85rem;
+  border-radius: 5px;
 }
 
 body.is-mobile .timer-container {
@@ -1515,54 +1575,113 @@ body.is-mobile .action-btn.needle {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(230, 180, 0, 0.45) 0%, rgba(80, 50, 0, 0.75) 100%) !important;
-  border: 1.5px solid rgba(250, 200, 0, 0.45) !important;
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    inset 0 0 10px rgba(250, 200, 0, 0.15);
+  background: rgba(10, 25, 50, 0.5) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px dashed rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35) !important;
+  opacity: 0.65;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-body.is-mobile .action-btn.needle:active,
-body.is-mobile .action-btn.needle.active {
-  background: radial-gradient(circle, rgba(250, 220, 0, 0.7) 0%, rgba(120, 80, 0, 0.85) 100%) !important;
-  border-color: rgba(255, 230, 0, 0.9) !important;
+/* When the player actually has a needle */
+body.is-mobile .action-btn.needle.has-needle {
+  opacity: 1;
+  background: rgba(10, 25, 50, 0.8) !important;
+  border: 1.5px solid var(--accent-blue) !important;
   box-shadow: 
-    0 0 16px rgba(250, 200, 0, 0.5),
-    inset 0 0 10px rgba(255, 255, 255, 0.35) !important;
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(0, 210, 255, 0.3),
+    inset 0 0 8px rgba(0, 210, 255, 0.15) !important;
+}
+
+body.is-mobile .action-btn.needle.has-needle:active,
+body.is-mobile .action-btn.needle.has-needle.active {
+  background: rgba(0, 210, 255, 0.25) !important;
+  border-color: rgba(0, 210, 255, 0.9) !important;
+  box-shadow: 
+    0 0 18px rgba(0, 210, 255, 0.6),
+    inset 0 0 8px rgba(255, 255, 255, 0.4) !important;
   transform: scale(0.9);
 }
 
-body.is-mobile .action-btn.needle.can-use {
-  animation: needle-pulse 0.8s infinite alternate ease-in-out;
-  border-color: rgba(255, 230, 0, 0.9) !important;
+/* When the player actually has a dart */
+body.is-mobile .action-btn.needle.has-dart {
+  opacity: 1;
+  background: rgba(10, 25, 50, 0.8) !important;
+  border: 1.5px solid #ffa500 !important;
   box-shadow: 
-    0 0 18px rgba(250, 200, 0, 0.85),
-    inset 0 0 10px rgba(255, 255, 255, 0.45) !important;
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(255, 165, 0, 0.3),
+    inset 0 0 8px rgba(255, 165, 0, 0.15) !important;
 }
 
-@keyframes needle-pulse {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.18); }
+body.is-mobile .action-btn.needle.has-dart:active,
+body.is-mobile .action-btn.needle.has-dart.active {
+  background: rgba(255, 165, 0, 0.25) !important;
+  border-color: rgba(255, 180, 0, 0.9) !important;
+  box-shadow: 
+    0 0 18px rgba(255, 165, 0, 0.6),
+    inset 0 0 8px rgba(255, 255, 255, 0.4) !important;
+  transform: scale(0.9);
+}
+
+/* Flashing pulsing glow when item CAN be used */
+body.is-mobile .action-btn.needle.can-use.has-needle {
+  animation: needle-pulse-cyan 0.8s infinite alternate ease-in-out;
+  opacity: 1;
+}
+
+body.is-mobile .action-btn.needle.can-use.has-dart {
+  animation: needle-pulse-orange 0.8s infinite alternate ease-in-out;
+  opacity: 1;
+}
+
+@keyframes needle-pulse-cyan {
+  0% { 
+    transform: scale(1); 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(0, 210, 255, 0.4); 
+  }
+  100% { 
+    transform: scale(1.15); 
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 210, 255, 0.85), inset 0 0 10px rgba(255, 255, 255, 0.4) !important; 
+    border-color: rgba(0, 230, 255, 0.95) !important;
+  }
+}
+
+@keyframes needle-pulse-orange {
+  0% { 
+    transform: scale(1); 
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 165, 0, 0.4); 
+  }
+  100% { 
+    transform: scale(1.15); 
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 165, 0, 0.85), inset 0 0 10px rgba(255, 255, 255, 0.4) !important; 
+    border-color: rgba(255, 180, 0, 0.95) !important;
+  }
 }
 
 body.is-mobile .action-btn.bomb {
   width: 66px;
   height: 66px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 190, 255, 0.45) 0%, rgba(0, 60, 120, 0.75) 100%) !important;
-  border: 1.5px solid rgba(0, 200, 255, 0.5) !important;
+  background: rgba(10, 25, 50, 0.75) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 0, 127, 0.45) !important;
   box-shadow: 
     0 6px 16px rgba(0, 0, 0, 0.4),
-    inset 0 0 12px rgba(0, 200, 255, 0.15);
+    0 0 10px rgba(255, 0, 127, 0.15),
+    inset 0 0 12px rgba(255, 0, 127, 0.1) !important;
 }
 
 body.is-mobile .action-btn.bomb:active,
 body.is-mobile .action-btn.bomb.active {
-  background: radial-gradient(circle, rgba(0, 230, 255, 0.7) 0%, rgba(0, 90, 180, 0.85) 100%) !important;
-  border-color: rgba(0, 240, 255, 0.9) !important;
+  background: rgba(255, 0, 127, 0.25) !important;
+  border-color: var(--accent-pink) !important;
   box-shadow: 
-    0 0 20px rgba(0, 210, 255, 0.6),
-    inset 0 0 12px rgba(255, 255, 255, 0.4) !important;
+    0 0 20px rgba(255, 0, 127, 0.6),
+    inset 0 0 12px rgba(255, 255, 255, 0.45) !important;
   transform: scale(0.9);
 }
 

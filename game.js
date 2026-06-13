@@ -952,8 +952,8 @@ class Game {
             <span class="hud-stat" id="hud-c-bubble-${cpu.id}">🎈 0/${cpu.maxBubbles}</span>
             <span class="hud-stat" id="hud-c-len-${cpu.id}">📏 ${cpu.bubbleLength}</span>
             <span class="hud-stat" id="hud-c-speed-${cpu.id}">⚡ ${cpu.speed.toFixed(1)}</span>
-            <span class="hud-stat" id="hud-c-item-${cpu.id}">🎒 無</span>
-            <span class="hud-stat" id="hud-c-pet-${cpu.id}">🐱 無</span>
+            <span class="hud-stat hud-item-slot" id="hud-c-item-${cpu.id}">🎒</span>
+            <span class="hud-stat hud-item-slot" id="hud-c-pet-${cpu.id}">🐱</span>
           </div>
         </div>
         <div class="profile-avatar ${cpu.charKey}-color" id="cpu-hud-avatar-${cpu.id}"></div>
@@ -998,14 +998,23 @@ class Game {
       
       const itemEl = document.getElementById('hud-p-item');
       if (itemEl) {
-        let itemText = '🎒 無';
-        if (this.player.itemSlot === 'needle') itemText = '📍 針';
-        else if (this.player.itemSlot === 'dart') itemText = '🎯 飛針';
+        let itemText = '🎒';
+        itemEl.classList.remove('has-item');
+        if (this.player.itemSlot === 'needle') {
+          itemText = '📍';
+          itemEl.classList.add('has-item');
+        } else if (this.player.itemSlot === 'dart') {
+          itemText = '🎯';
+          itemEl.classList.add('has-item');
+        }
         itemEl.textContent = itemText;
       }
       
       const pPetEl = document.getElementById('hud-p-pet');
-      if (pPetEl) pPetEl.textContent = `🐱 ${this.player.hasPet ? '有' : '無'}`;
+      if (pPetEl) {
+        pPetEl.textContent = '🐱';
+        pPetEl.classList.toggle('has-pet', !!this.player.hasPet);
+      }
 
       const pAvatar = document.getElementById('player-hud-avatar');
       pAvatar.className = 'profile-avatar';
@@ -1038,6 +1047,14 @@ class Game {
 
       const needleBtn = document.getElementById('btn-needle');
       if (needleBtn) {
+        // Toggle dynamic item status classes
+        needleBtn.classList.remove('has-needle', 'has-dart');
+        if (this.player.itemSlot === 'needle') {
+          needleBtn.classList.add('has-needle');
+        } else if (this.player.itemSlot === 'dart') {
+          needleBtn.classList.add('has-dart');
+        }
+
         const canUseNeedle = this.player.itemSlot === 'needle' && this.player.state === 'trapped';
         const canUseDart = this.player.itemSlot === 'dart' && this.player.state === 'normal';
         if (canUseNeedle || canUseDart) {
@@ -1061,12 +1078,21 @@ class Game {
         if (lenEl) lenEl.textContent = `📏 ${cpu.bubbleLength}`;
         if (speedEl) speedEl.textContent = `⚡ ${cpu.speed.toFixed(1)}`;
         if (itemEl) {
-          let itemText = '🎒 無';
-          if (cpu.itemSlot === 'needle') itemText = '📍 針';
-          else if (cpu.itemSlot === 'dart') itemText = '🎯 飛針';
+          let itemText = '🎒';
+          itemEl.classList.remove('has-item');
+          if (cpu.itemSlot === 'needle') {
+            itemText = '📍';
+            itemEl.classList.add('has-item');
+          } else if (cpu.itemSlot === 'dart') {
+            itemText = '🎯';
+            itemEl.classList.add('has-item');
+          }
           itemEl.textContent = itemText;
         }
-        if (petEl) petEl.textContent = `🐱 ${cpu.hasPet ? '有' : '無'}`;
+        if (petEl) {
+          petEl.textContent = '🐱';
+          petEl.classList.toggle('has-pet', !!cpu.hasPet);
+        }
         
         if (profileEl) {
           if (cpu.state === 'dead' || cpu.state === 'dying') {
