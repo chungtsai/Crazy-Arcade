@@ -212,6 +212,25 @@ class SoundFX {
     osc.start();
     osc.stop(now + 0.3);
   }
+
+  playJump() {
+    this.init();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+    
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+    
+    osc.start();
+    osc.stop(now + 0.25);
+  }
 }
 
 const sfx = new SoundFX();

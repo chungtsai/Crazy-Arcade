@@ -1037,15 +1037,23 @@ class Game {
 
   setupMobileControls() {
     const checkMobile = () => {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                       ('ontouchstart' in window) ||
-                       (navigator.maxTouchPoints > 0) ||
-                       (window.innerWidth <= 768);
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                             ('ontouchstart' in window) ||
+                             (navigator.maxTouchPoints > 0);
+      const isSmallScreen = window.innerWidth <= 768;
+      const isMobile = isMobileDevice || isSmallScreen;
+      const isTablet = isMobileDevice && !isSmallScreen;
 
       if (isMobile) {
         document.body.classList.add('is-mobile');
       } else {
         document.body.classList.remove('is-mobile');
+      }
+
+      if (isTablet) {
+        document.body.classList.add('is-tablet');
+      } else {
+        document.body.classList.remove('is-tablet');
       }
     };
 
@@ -1352,6 +1360,14 @@ class Game {
     this.items = [];
     this.cratesDestroyedCount = 0;
     this.keys = {};
+    if (this.particles) {
+      for (const p of this.particles) {
+        if (p.graphics) {
+          p.graphics.destroy();
+        }
+      }
+    }
+    this.particles = [];
 
     this.backgroundContainer = new PIXI.Container();
     this.mapContainer = new PIXI.Container();
@@ -1359,6 +1375,7 @@ class Game {
     this.bubbleContainer = new PIXI.Container();
     this.flameContainer = new PIXI.Container();
     this.characterContainer = new PIXI.Container();
+    this.particleContainer = new PIXI.Container();
 
     this.app.stage.addChild(this.backgroundContainer);
     this.app.stage.addChild(this.mapContainer);
@@ -1366,6 +1383,7 @@ class Game {
     this.app.stage.addChild(this.bubbleContainer);
     this.app.stage.addChild(this.flameContainer);
     this.app.stage.addChild(this.characterContainer);
+    this.app.stage.addChild(this.particleContainer);
 
     this.drawBackground();
     this.drawMap();
@@ -1403,6 +1421,7 @@ class Game {
     }
 
     this.player = {
+      charKey: localCharKey,
       x: localX,
       y: localY,
       radius: TILE_SIZE * 0.38,
@@ -1498,6 +1517,7 @@ class Game {
       }
 
       const pObj = {
+        charKey: charKey,
         role: role,
         x: spawnX,
         y: spawnY,
@@ -1575,6 +1595,7 @@ class Game {
     } else if (this.is2PMode) {
       const config2 = CHARACTER_CONFIGS[this.selectedChar2 || 'bazzi'];
       this.player2 = {
+        charKey: this.selectedChar2 || 'bazzi',
         x: TILE_SIZE * 0.5 + 2,
         y: GAME_HEIGHT - TILE_SIZE * 0.5 - 2,
         radius: TILE_SIZE * 0.38,
@@ -1838,6 +1859,9 @@ class Game {
       } else if (playerObj.itemSlot === 'dart') {
         itemText = '🎯';
         itemEl.classList.add('has-item');
+      } else if (playerObj.itemSlot === 'spring_shoe') {
+        itemText = '🦘';
+        itemEl.classList.add('has-item');
       }
       itemEl.textContent = itemText;
     }
@@ -1884,6 +1908,9 @@ class Game {
       } else if (localPlayer.itemSlot === 'dart') {
         needleBtnEmoji.textContent = '🎯';
         needleBtnLabel.textContent = '飛針';
+      } else if (localPlayer.itemSlot === 'spring_shoe') {
+        needleBtnEmoji.textContent = '🦘';
+        needleBtnLabel.textContent = '彈簧鞋';
       } else {
         needleBtnEmoji.textContent = '🎒';
         needleBtnLabel.textContent = '道具';
@@ -1892,16 +1919,19 @@ class Game {
 
     const needleBtn = document.getElementById('btn-needle');
     if (needleBtn) {
-      needleBtn.classList.remove('has-needle', 'has-dart');
+      needleBtn.classList.remove('has-needle', 'has-dart', 'has-spring-shoe');
       if (localPlayer.itemSlot === 'needle') {
         needleBtn.classList.add('has-needle');
       } else if (localPlayer.itemSlot === 'dart') {
         needleBtn.classList.add('has-dart');
+      } else if (localPlayer.itemSlot === 'spring_shoe') {
+        needleBtn.classList.add('has-spring-shoe');
       }
 
       const canUseNeedle = localPlayer.itemSlot === 'needle' && localPlayer.state === 'trapped';
       const canUseDart = localPlayer.itemSlot === 'dart' && localPlayer.state === 'normal';
-      if (canUseNeedle || canUseDart) {
+      const canUseSpringShoe = localPlayer.itemSlot === 'spring_shoe' && localPlayer.state === 'normal';
+      if (canUseNeedle || canUseDart || canUseSpringShoe) {
         needleBtn.classList.add('can-use');
       } else {
         needleBtn.classList.remove('can-use');
@@ -2006,6 +2036,36 @@ class Game {
         this.app.stage.addChild(dart.graphics);
         this.dartsProjectiles.push(dart);
       }
+    } else if (player.itemSlot === 'spring_shoe') {
+      if (player.state === 'normal' && !player.isJumping) {
+        let dx = player.dirX;
+        let dy = player.dirY;
+        if (dx === 0 && dy === 0) {
+          dy = 1;
+        }
+        const targetX = player.x + dx * TILE_SIZE;
+        const targetY = player.y + dy * TILE_SIZE;
+        const targetCol = Math.floor(targetX / TILE_SIZE);
+        const targetRow = Math.floor(targetY / TILE_SIZE);
+
+        const hasBomb = this.bubbles.some(b => b.col === targetCol && b.row === targetRow);
+        if (targetCol >= 0 && targetCol < GRID_COLS && targetRow >= 0 && targetRow < GRID_ROWS && 
+            this.grid[targetRow][targetCol] === 0 && !hasBomb) {
+          player.itemSlot = null;
+          sfx.playJump();
+          this.updateHUD();
+
+          player.isJumping = true;
+          player.jumpStartX = player.x;
+          player.jumpStartY = player.y;
+          player.jumpEndX = targetCol * TILE_SIZE + TILE_SIZE / 2;
+          player.jumpEndY = targetRow * TILE_SIZE + TILE_SIZE / 2;
+          player.jumpProgress = 0;
+          player.jumpDuration = 0.4;
+        } else {
+          this.showFloatingText(player.x, player.y - 20, "BLOCKED!", 0xff3333);
+        }
+      }
     }
 
     if (this.isNetMode && player === this.player) {
@@ -2046,7 +2106,7 @@ class Game {
     }
 
     // Player 1 use item
-    if (e.code === 'KeyN' || e.code === 'KeyF' || e.code === 'KeyE') {
+    if (e.code === 'KeyN' || e.code === 'KeyF' || e.code === 'KeyE' || e.code === 'KeyJ') {
       this.useActiveItem(this.player);
     }
 
@@ -2195,6 +2255,7 @@ class Game {
   }
 
   moveCharacter(char, dx, dy) {
+    if (char.isJumping) return;
     if (char.state !== 'normal') return;
 
     const prevX = char.x;
@@ -2207,6 +2268,25 @@ class Game {
     } else if (dy !== 0) {
       char.dirX = 0;
       char.dirY = Math.sign(dy);
+    }
+
+    if (char.hasKickShoe && dx !== 0) {
+      const dirX = Math.sign(dx);
+      const checkCol = Math.floor((char.x + dirX * char.radius * 0.95) / TILE_SIZE);
+      const checkRow = Math.floor(char.y / TILE_SIZE);
+      const aheadBubble = this.bubbles.find(b => b.col === checkCol && b.row === checkRow);
+      if (aheadBubble && !aheadBubble.isSliding) {
+        this.kickBubble(aheadBubble, dirX, 0);
+      }
+    }
+    if (char.hasKickShoe && dy !== 0) {
+      const dirY = Math.sign(dy);
+      const checkCol = Math.floor(char.x / TILE_SIZE);
+      const checkRow = Math.floor((char.y + dirY * char.radius * 0.95) / TILE_SIZE);
+      const aheadBubble = this.bubbles.find(b => b.col === checkCol && b.row === checkRow);
+      if (aheadBubble && !aheadBubble.isSliding) {
+        this.kickBubble(aheadBubble, 0, dirY);
+      }
     }
 
     if (dx !== 0) {
@@ -2317,6 +2397,14 @@ class Game {
       this.mountPet(char, 'fast_turtle');
     } else if (item.type === ITEM_TYPES.PET_SLOW_TURTLE) {
       this.mountPet(char, 'slow_turtle');
+    } else if (item.type === ITEM_TYPES.KICK_SHOE) {
+      char.hasKickShoe = true;
+      this.showFloatingText(char.x, char.y - 20, "KICK SHOES! 👟", 0x33ff99);
+    } else if (item.type === ITEM_TYPES.SPRING_SHOE) {
+      char.itemSlot = 'spring_shoe';
+    } else if (item.type === ITEM_TYPES.DEVIL) {
+      char.devilTimer = 5.0;
+      this.showFloatingText(char.x, char.y - 20, "CONFUSED! 😈", 0xff3333);
     }
     this.updateHUD();
   }
@@ -2352,6 +2440,7 @@ class Game {
     }
 
     sfx.playExplosion();
+    this.triggerScreenShake(0.22, 5.5);
   }
 
   destroyCrate(col, row, itemTypeOverride = undefined) {
@@ -2377,6 +2466,7 @@ class Game {
     this.grid[row][col] = 0;
     this.cratesDestroyedCount++;
     this.drawMap();
+    this.spawnCrateParticles(col, row);
 
     let chosenType = null;
     if (itemTypeOverride !== undefined) {
@@ -2387,13 +2477,16 @@ class Game {
       }
       if (Math.random() < 0.4) {
         const rand = Math.random();
-        if (rand < 0.55) {
+        if (rand < 0.45) {
           const standardTypes = [ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.SPEED_UP];
           chosenType = standardTypes[Math.floor(Math.random() * standardTypes.length)];
-        } else if (rand < 0.75) {
+        } else if (rand < 0.58) {
           chosenType = ITEM_TYPES.NEEDLE;
-        } else if (rand < 0.90) {
+        } else if (rand < 0.70) {
           chosenType = ITEM_TYPES.DART;
+        } else if (rand < 0.85) {
+          const newPool = [ITEM_TYPES.KICK_SHOE, ITEM_TYPES.SPRING_SHOE, ITEM_TYPES.DEVIL];
+          chosenType = newPool[Math.floor(Math.random() * newPool.length)];
         } else {
           const petPool = [ITEM_TYPES.PET, ITEM_TYPES.PET_FAST_TURTLE, ITEM_TYPES.PET_SLOW_TURTLE];
           chosenType = petPool[Math.floor(Math.random() * petPool.length)];
@@ -2456,6 +2549,9 @@ class Game {
       else if (item.type === ITEM_TYPES.PET) emoji = '🐱';
       else if (item.type === ITEM_TYPES.PET_FAST_TURTLE) emoji = '🐢💨';
       else if (item.type === ITEM_TYPES.PET_SLOW_TURTLE) emoji = '🐢💤';
+      else if (item.type === ITEM_TYPES.KICK_SHOE) emoji = '👟';
+      else if (item.type === ITEM_TYPES.SPRING_SHOE) emoji = '🦘';
+      else if (item.type === ITEM_TYPES.DEVIL) emoji = '😈';
 
       const style = new PIXI.TextStyle({
         fontSize: 22,
@@ -2657,6 +2753,11 @@ class Game {
           if (Math.abs(diffY) > 2) dy = Math.sign(diffY) * Math.min(Math.abs(diffY), stepSpeed);
         }
 
+        if (cpu.devilTimer && cpu.devilTimer > 0) {
+          dx = -dx;
+          dy = -dy;
+        }
+
         this.moveCharacter(cpu, dx, dy);
       }
     }
@@ -2765,13 +2866,24 @@ class Game {
         // Run validation: If we place a bubble on cpuCol, cpuRow, can we escape safely?
         if (triggerPlace && cpu.placedCount < cpu.maxBubbles && cpu.placeCooldown <= 0) {
           const hypotheticalDanger = this.getDangerousZonesForBomb(cpuCol, cpuRow, cpu.bubbleLength);
-          const tempBubbles = [...dangerZones, ...hypotheticalDanger];
-          const escapeTest = this.findClosestSafeTile(cpuCol, cpuRow, tempBubbles);
-          if (escapeTest && escapeTest.path.length > 0) {
-            this.placeBubble(cpu);
-            cpu.placeCooldown = 2.0; // Prevent spamming
-            cpu.aiState = 'escape';
-            cpu.movePath = escapeTest.path;
+          
+          // AI Intelligence Optimization: Avoid friendly fire. Do not place bubble if teammate is in the blast radius.
+          const activeTeammates = teammates.filter(t => t.state !== 'dead' && t.state !== 'dying');
+          const teammateInDanger = activeTeammates.some(t => {
+            const tc = Math.floor(t.x / TILE_SIZE);
+            const tr = Math.floor(t.y / TILE_SIZE);
+            return hypotheticalDanger.some(z => z.col === tc && z.row === tr);
+          });
+
+          if (!teammateInDanger) {
+            const tempBubbles = [...dangerZones, ...hypotheticalDanger];
+            const escapeTest = this.findClosestSafeTile(cpuCol, cpuRow, tempBubbles);
+            if (escapeTest && escapeTest.path.length > 0) {
+              this.placeBubble(cpu);
+              cpu.placeCooldown = 2.0; // Prevent spamming
+              cpu.aiState = 'escape';
+              cpu.movePath = escapeTest.path;
+            }
           }
         }
 
@@ -3015,8 +3127,17 @@ class Game {
       }
     }
 
+    if (this.player && this.player.devilTimer > 0) {
+      playerDx = -playerDx;
+      playerDy = -playerDy;
+    }
     this.moveCharacter(this.player, playerDx * this.cappedDelta, playerDy * this.cappedDelta);
+
     if (this.is2PMode && this.player2) {
+      if (this.player2.devilTimer > 0) {
+        player2Dx = -player2Dx;
+        player2Dy = -player2Dy;
+      }
       this.moveCharacter(this.player2, player2Dx * this.cappedDelta, player2Dy * this.cappedDelta);
     }
 
@@ -3042,8 +3163,74 @@ class Game {
       }
     }
 
+    // Update Screen Shake
+    if (this.shakeTimer && this.shakeTimer > 0) {
+      this.shakeTimer -= dt;
+      if (this.shakeTimer <= 0) {
+        this.shakeTimer = 0;
+        this.app.stage.position.set(0, 0);
+      } else {
+        const sx = (Math.random() - 0.5) * this.shakeIntensity;
+        const sy = (Math.random() - 0.5) * this.shakeIntensity;
+        this.app.stage.position.set(sx, sy);
+      }
+    }
+
+    // Update Particles
+    if (this.particles) {
+      for (let i = this.particles.length - 1; i >= 0; i--) {
+        const p = this.particles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+          this.particleContainer.removeChild(p.graphics);
+          p.graphics.destroy();
+          this.particles.splice(i, 1);
+        } else {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 220 * dt; // gravity
+          p.graphics.clear();
+          const alpha = p.life / p.maxLife;
+          p.graphics.beginFill(p.color, alpha);
+          p.graphics.drawRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+          p.graphics.endFill();
+        }
+      }
+    }
+
     for (let i = this.bubbles.length - 1; i >= 0; i--) {
       const b = this.bubbles[i];
+
+      // Update Sliding Bubble
+      if (b.isSliding) {
+        b.slideProgress += dt * 8;
+        if (b.slideProgress >= 1.0) {
+          b.x = b.endX;
+          b.y = b.endY;
+          b.isSliding = false;
+
+          const nextCol = b.col + b.slideDirX;
+          const nextRow = b.row + b.slideDirY;
+          const hasObstacle = nextCol < 0 || nextCol >= GRID_COLS || nextRow < 0 || nextRow >= GRID_ROWS ||
+                              this.grid[nextRow][nextCol] !== 0 ||
+                              this.bubbles.some(other => other !== b && other.col === nextCol && other.row === nextRow) ||
+                              this.items.some(it => it.col === nextCol && it.row === nextRow);
+          if (!hasObstacle) {
+            b.slideProgress = 0;
+            b.startX = b.x;
+            b.startY = b.y;
+            b.col = nextCol;
+            b.row = nextRow;
+            b.endX = nextCol * TILE_SIZE + TILE_SIZE / 2;
+            b.endY = nextRow * TILE_SIZE + TILE_SIZE / 2;
+            b.isSliding = true;
+          }
+        } else {
+          b.x = b.startX + (b.endX - b.startX) * b.slideProgress;
+          b.y = b.startY + (b.endY - b.startY) * b.slideProgress;
+        }
+      }
+
       b.timer -= dt;
       b.scalePhase += dt * 8;
 
@@ -3176,6 +3363,46 @@ class Game {
       char.invincibilityTimer -= dt;
     }
 
+    if (char.isJumping) {
+      char.jumpProgress += dt / char.jumpDuration;
+      if (char.jumpProgress >= 1.0) {
+        char.x = char.jumpEndX;
+        char.y = char.jumpEndY;
+        char.isJumping = false;
+        char.jumpProgress = 0;
+
+        // Check if standing on an item and collect it immediately
+        const col = Math.floor(char.x / TILE_SIZE);
+        const row = Math.floor(char.y / TILE_SIZE);
+        const itemIndex = this.items.findIndex(it => it.col === col && it.row === row);
+        if (itemIndex !== -1) {
+          const item = this.items[itemIndex];
+          this.collectItem(char, item);
+          this.itemContainer.removeChild(item.graphics);
+          item.graphics.destroy({ children: true });
+          this.items.splice(itemIndex, 1);
+
+          if (this.isNetMode && char === this.player) {
+            this.sendNetMessage({
+              type: 'collect_item',
+              col,
+              row
+            });
+          }
+        }
+      } else {
+        char.x = char.jumpStartX + (char.jumpEndX - char.jumpStartX) * char.jumpProgress;
+        char.y = char.jumpStartY + (char.jumpEndY - char.jumpStartY) * char.jumpProgress;
+      }
+    }
+
+    if (char.devilTimer && char.devilTimer > 0) {
+      char.devilTimer -= dt;
+      if (char.devilTimer <= 0) {
+        char.devilTimer = 0;
+      }
+    }
+
     if (char.state === 'trapped') {
       char.trapTimer -= dt;
       if (char.trapTimer <= 0) {
@@ -3236,6 +3463,7 @@ class Game {
     let stateChanged = false;
     for (const char of characters) {
       if (char.state === 'dead' || char.state === 'dying') continue;
+      if (char.isJumping) continue;
 
       const charCol = Math.floor(char.x / TILE_SIZE);
       const charRow = Math.floor(char.y / TILE_SIZE);
@@ -3278,6 +3506,9 @@ class Game {
     const g = char.graphics;
     g.clear();
 
+    const bodyColor = char.team === 'red' ? 0xff3b30 : 0x007aff;
+    const teamColorHex = char.team === 'red' ? 0xff4d4d : 0x4d4dff;
+
     // Blinking effect when invincible
     g.alpha = (char.invincibilityTimer > 0 && Math.floor(Date.now() / 100) % 2 === 0) ? 0.35 : 1.0;
 
@@ -3294,6 +3525,22 @@ class Game {
     let drawX = char.x;
     let drawY = char.y;
 
+    if (char.isJumping) {
+      const p = char.jumpProgress;
+      const jumpHeight = 45 * 4 * p * (1 - p);
+      drawY -= jumpHeight;
+    }
+
+    if (char.devilTimer && char.devilTimer > 0) {
+      g.rotation = 0.12 * Math.sin(Date.now() * 0.015);
+      g.pivot.set(char.x, char.y);
+      g.position.set(char.x + 4 * Math.sin(Date.now() * 0.025), char.y);
+    } else {
+      g.rotation = 0;
+      g.pivot.set(0, 0);
+      g.position.set(0, 0);
+    }
+
     const isMoving = char.lastX !== undefined && (Math.abs(char.x - char.lastX) > 0.1 || Math.abs(char.y - char.lastY) > 0.1);
     char.lastX = char.x;
     char.lastY = char.y;
@@ -3306,7 +3553,15 @@ class Game {
       drawY = char.y - 12 + bob;
 
       const petX = char.x;
-      const petY = char.y + 6 + bob * 0.5;
+      let petY = char.y + 6 + bob * 0.5;
+
+      if (char.isJumping) {
+        const p = char.jumpProgress;
+        const jumpHeight = 45 * 4 * p * (1 - p);
+        drawY -= jumpHeight;
+        petY -= jumpHeight;
+      }
+
       const petR = char.radius * 1.1;
 
       if (char.hasPet === 'fast_turtle' || char.hasPet === 'slow_turtle') {
@@ -3577,7 +3832,7 @@ class Game {
       g.drawCircle(char.x, char.y - 12, char.radius * 1.3 * pulse);
       g.lineStyle(0);
 
-      g.beginFill(char.color);
+      g.beginFill(bodyColor);
       g.drawCircle(char.x, char.y - 12, char.radius * 0.8);
       g.endFill();
 
@@ -3649,6 +3904,17 @@ class Game {
       char.overheadText.y = drawY - char.radius - 15;
     }
 
+    // 1. Draw Under-foot Team Ring / Aura
+    if (char.state === 'normal') {
+      const pulse = 1.0 + 0.06 * Math.sin(Date.now() * 0.01);
+      g.lineStyle(3, teamColorHex, 0.35);
+      g.drawEllipse(char.x, char.y + char.radius - 2, char.radius * 1.25 * pulse, 6 * pulse);
+      g.lineStyle(1.5, teamColorHex, 0.85);
+      g.drawEllipse(char.x, char.y + char.radius - 2, char.radius * 1.05 * pulse, 4.8 * pulse);
+      g.lineStyle(0);
+    }
+
+    // 2. Draw Shadow
     g.beginFill(0x000000, 0.25);
     if (char.hasPet && char.state === 'normal') {
       g.drawEllipse(char.x, char.y + 18, char.radius * 1.3, 8);
@@ -3657,13 +3923,66 @@ class Game {
     }
     g.endFill();
 
-    g.beginFill(char.color);
+    // 3. Draw Character Hood Ears / Accessories (drawn behind main head circle)
+    const charKey = char.charKey || 'dao';
+    if (charKey === 'dao') {
+      // Dao round blue ears
+      g.beginFill(0x0066cc);
+      g.drawCircle(drawX - char.radius * 0.65, drawY - char.radius * 0.6, char.radius * 0.35);
+      g.drawCircle(drawX + char.radius * 0.65, drawY - char.radius * 0.6, char.radius * 0.35);
+      g.endFill();
+      g.beginFill(0x5ebcff); 
+      g.drawCircle(drawX - char.radius * 0.65, drawY - char.radius * 0.6, char.radius * 0.18);
+      g.drawCircle(drawX + char.radius * 0.65, drawY - char.radius * 0.6, char.radius * 0.18);
+      g.endFill();
+    } else if (charKey === 'bazzi') {
+      // Bazzi pointed red ears
+      g.beginFill(0xcc0033);
+      g.moveTo(drawX - char.radius * 0.35, drawY - char.radius * 0.75);
+      g.lineTo(drawX - char.radius * 0.75, drawY - char.radius * 1.25);
+      g.lineTo(drawX - char.radius * 0.1, drawY - char.radius * 0.9);
+      g.endFill();
+      g.beginFill(0xcc0033);
+      g.moveTo(drawX + char.radius * 0.35, drawY - char.radius * 0.75);
+      g.lineTo(drawX + char.radius * 0.75, drawY - char.radius * 1.25);
+      g.lineTo(drawX + char.radius * 0.1, drawY - char.radius * 0.9);
+      g.endFill();
+    } else if (charKey === 'marid') {
+      // Marid round yellow ears
+      g.beginFill(0xcca300);
+      g.drawCircle(drawX - char.radius * 0.55, drawY - char.radius * 0.55, char.radius * 0.3);
+      g.drawCircle(drawX + char.radius * 0.55, drawY - char.radius * 0.55, char.radius * 0.3);
+      g.endFill();
+      g.beginFill(0xffe66d); 
+      g.drawCircle(drawX - char.radius * 0.55, drawY - char.radius * 0.55, char.radius * 0.15);
+      g.drawCircle(drawX + char.radius * 0.55, drawY - char.radius * 0.55, char.radius * 0.15);
+      g.endFill();
+    }
+
+    // 4. Draw Main Head/Body Circle in Team Color
+    g.beginFill(bodyColor);
     g.drawCircle(drawX, drawY, char.radius);
     g.endFill();
 
+    // 5. Draw Marid Ribbon Bow (if Marid, drawn on top of head circle)
+    if (charKey === 'marid') {
+      g.beginFill(0xff4da6); // Vibrant pink ribbon
+      g.moveTo(drawX, drawY - char.radius * 0.8);
+      g.lineTo(drawX - char.radius * 0.45, drawY - char.radius * 1.15);
+      g.lineTo(drawX - char.radius * 0.45, drawY - char.radius * 0.55);
+      g.lineTo(drawX, drawY - char.radius * 0.8);
+      g.lineTo(drawX + char.radius * 0.45, drawY - char.radius * 1.15);
+      g.lineTo(drawX + char.radius * 0.45, drawY - char.radius * 0.55);
+      g.lineTo(drawX, drawY - char.radius * 0.8);
+      g.endFill();
+      g.beginFill(0xffcc00); // Yellow knot
+      g.drawCircle(drawX, drawY - char.radius * 0.8, char.radius * 0.15);
+      g.endFill();
+    }
+
     // Draw Player's dangling feet when riding a pet
     if (char.hasPet && char.state === 'normal') {
-      g.beginFill(char.color);
+      g.beginFill(bodyColor);
       g.drawCircle(drawX - char.radius * 0.7, drawY + char.radius * 0.6, 4.5);
       g.drawCircle(drawX + char.radius * 0.7, drawY + char.radius * 0.6, 4.5);
       g.endFill();
@@ -3674,8 +3993,19 @@ class Game {
       g.endFill();
     }
 
+    // 6. Draw Face Area
     g.beginFill(char.faceColor);
     g.drawRoundedRect(drawX - char.radius * 0.65, drawY - char.radius * 0.2, char.radius * 1.3, char.radius * 0.8, 6);
+    g.endFill();
+
+    // 7. Draw Team Jersey V-Collar (overlay on face lower border)
+    g.beginFill(0xffffff, 0.95); 
+    g.moveTo(drawX - char.radius * 0.3, drawY + char.radius * 0.65);
+    g.lineTo(drawX + char.radius * 0.3, drawY + char.radius * 0.65);
+    g.lineTo(drawX, drawY + char.radius * 0.95);
+    g.endFill();
+    g.beginFill(teamColorHex);
+    g.drawCircle(drawX, drawY + char.radius * 0.72, 3);
     g.endFill();
 
     g.beginFill(0x111111);
@@ -3695,6 +4025,64 @@ class Game {
     g.lineTo(drawX + 6, drawY - char.radius - 12);
     g.lineTo(drawX, drawY - char.radius - 6);
     g.endFill();
+  }
+
+  kickBubble(bubble, dirX, dirY) {
+    if (bubble.isSliding) return;
+    
+    const nextCol = bubble.col + dirX;
+    const nextRow = bubble.row + dirY;
+    
+    const hasObstacle = nextCol < 0 || nextCol >= GRID_COLS || nextRow < 0 || nextRow >= GRID_ROWS ||
+                        this.grid[nextRow][nextCol] !== 0 ||
+                        this.bubbles.some(other => other.col === nextCol && other.row === nextRow) ||
+                        this.items.some(it => it.col === nextCol && it.row === nextRow);
+    if (!hasObstacle) {
+      bubble.slideProgress = 0;
+      bubble.startX = bubble.x;
+      bubble.startY = bubble.y;
+      bubble.col = nextCol;
+      bubble.row = nextRow;
+      bubble.endX = nextCol * TILE_SIZE + TILE_SIZE / 2;
+      bubble.endY = nextRow * TILE_SIZE + TILE_SIZE / 2;
+      bubble.isSliding = true;
+      bubble.slideDirX = dirX;
+      bubble.slideDirY = dirY;
+      bubble.allowedCharacters = [];
+    }
+  }
+
+  triggerScreenShake(duration = 0.2, intensity = 6.0) {
+    this.shakeTimer = duration;
+    this.shakeIntensity = intensity;
+  }
+
+  spawnCrateParticles(col, row) {
+    const mapConf = MAPS_CONFIG[this.selectedMap];
+    const color = mapConf.crateColor || 0xbf7130;
+    const cx = col * TILE_SIZE + TILE_SIZE / 2;
+    const cy = row * TILE_SIZE + TILE_SIZE / 2;
+    
+    const count = 10 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 50 + Math.random() * 90;
+      const particle = {
+        x: cx + (Math.random() - 0.5) * 16,
+        y: cy + (Math.random() - 0.5) * 16,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 30,
+        life: 0.45 + Math.random() * 0.3,
+        maxLife: 0.45 + Math.random() * 0.3,
+        size: 3 + Math.random() * 5,
+        color: color,
+        graphics: new PIXI.Graphics()
+      };
+      if (this.particleContainer) {
+        this.particleContainer.addChild(particle.graphics);
+        this.particles.push(particle);
+      }
+    }
   }
 
   showFloatingText(x, y, textStr, colorHex) {
@@ -3721,7 +4109,7 @@ class Game {
         if (frames <= 0) {
           this.characterContainer.removeChild(text);
           this.app.ticker.remove(anim);
-          text.destroy();
+          text.destroy(true);
         }
       };
       this.app.ticker.add(anim);
@@ -3737,11 +4125,13 @@ class Game {
     for (let i = 0; i < chars.length; i++) {
       const charA = chars[i];
       if (charA.state !== 'normal') continue;
+      if (charA.isJumping) continue;
 
       for (let j = 0; j < chars.length; j++) {
         if (i === j) continue;
         const charB = chars[j];
         if (charB.state !== 'trapped') continue;
+        if (charB.isJumping) continue;
 
         const dist = Math.hypot(charA.x - charB.x, charA.y - charB.y);
         if (dist < (charA.radius + charB.radius)) {
