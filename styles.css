@@ -73,45 +73,127 @@ body {
   z-index: 10;
 }
 
-/* Lobby screen scaling - restore scrolling for PC, hide scrollbar */
+/* --- 頂層 Lobby 螢幕控制 (PC) --- */
 #lobby-screen {
-  max-height: 100vh;
-  overflow-y: auto;
-  width: 100%;
-  padding: 2rem 1rem;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  padding: 1rem;
   box-sizing: border-box;
 }
-#lobby-screen::-webkit-scrollbar { display: none; }
-
-/* Custom Scrollbar for Lobby */
-#lobby-screen::-webkit-scrollbar {
-  width: 8px;
+/* Custom Scrollbar for Lobby Columns and team slots */
+.lobby-tab-content::-webkit-scrollbar, .team-slots::-webkit-scrollbar {
+  width: 6px;
 }
 
-#lobby-screen::-webkit-scrollbar-track {
+.lobby-tab-content::-webkit-scrollbar-track, .team-slots::-webkit-scrollbar-track {
   background: rgba(10, 25, 50, 0.3);
 }
 
-#lobby-screen::-webkit-scrollbar-thumb {
+.lobby-tab-content::-webkit-scrollbar-thumb, .team-slots::-webkit-scrollbar-thumb {
   background: rgba(0, 210, 255, 0.3);
   border-radius: 4px;
   border: 1px solid rgba(0, 210, 255, 0.1);
 }
 
-#lobby-screen::-webkit-scrollbar-thumb:hover {
+.lobby-tab-content::-webkit-scrollbar-thumb:hover, .team-slots::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 210, 255, 0.6);
   box-shadow: 0 0 8px rgba(0, 210, 255, 0.5);
 }
 
 /* Lobby / Start Screen UI */
 .main-menu {
-  width: 580px;
-  max-width: 90vw;
-  text-align: center;
+  width: 980px; /* 大螢幕擴展寬度 */
+  max-width: 95vw;
+  height: 85vh; /* 限制大廳最大高度，不超出視窗 */
+  max-height: 680px;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
-  margin: auto;
+  gap: 1.2rem;
+  padding: 1.5rem 2rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- 標題與頁籤 --- */
+.title-container {
+  margin-bottom: 0;
+}
+.game-title {
+  font-size: 1.8rem;
+  margin: 0;
+}
+.sub-title {
+  font-size: 0.8rem;
+  margin: 2px 0 0 0;
+}
+
+/* 預設隱藏頁籤按鈕 (PC) */
+.lobby-tabs {
+  display: none;
+}
+
+/* --- 內容容器 (PC 雙欄) --- */
+.lobby-content-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0; /* 關鍵：允許內部子容器滾動 */
+  overflow: hidden;
+}
+
+/* 在 PC 上所有分頁都是可見且並排的 */
+.lobby-tab-content {
+  display: flex !important; /* 強制覆蓋 */
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto; /* 若內容過長，各欄位獨立滾動 */
+  padding-right: 0.5rem;
+}
+
+/* 優化地圖選單 grid */
+.map-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) !important; /* Override original flex/columns */
+  gap: 0.6rem !important;
+}
+.map-card {
+  min-width: 0 !important; /* 消除原有的 min-width 限制 */
+  padding: 0.4rem !important;
+  border-radius: 8px !important;
+}
+.map-card .map-name {
+  font-size: 0.8rem !important;
+}
+
+/* 優化角色選單 */
+.char-grid {
+  gap: 0.75rem !important;
+}
+.char-card {
+  padding: 0.75rem 0.5rem !important;
+}
+.char-avatar {
+  width: 48px !important;
+  height: 48px !important;
+}
+.char-name {
+  font-size: 0.85rem !important;
+}
+.char-stats {
+  gap: 0.25rem !important;
+  font-size: 0.7rem !important;
+}
+.stat-bar {
+  width: 45px !important;
+}
+
+/* 操作說明在 PC 上顯示在右側下半部 */
+#lobby-tab-instructions {
+  display: none !important; /* PC 上直接隱藏第三分頁容器，因為操作說明我們會將它直接融入右側 character/team 選單下方 */
 }
 
 .game-title {
@@ -144,7 +226,30 @@ body {
   color: var(--accent-blue);
   margin-top: 0;
   letter-spacing: 2px;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
 }
+
+.sub-title.rolling-active {
+  color: #e0a3ff !important;
+  text-shadow: 0 0 10px rgba(224, 163, 255, 0.8), 0 0 20px rgba(224, 163, 255, 0.4);
+  animation: pulseOpacity 1.5s infinite alternate;
+}
+
+@keyframes pulseOpacity {
+  0% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.option-random {
+  color: #e0a3ff !important;
+  background-color: #120a21 !important;
+  font-weight: bold;
+}
+
 
 .game-mode-preview {
   background: rgba(255, 255, 255, 0.03);
@@ -798,20 +903,49 @@ body {
   color: #52c46c;
 }
 
+.map-card[data-map="forest05"] .map-badge {
+  background: rgba(45, 90, 39, 0.15);
+  border-color: #448a3b;
+  color: #5ac54f;
+}
+
+.map-card[data-map="desert08"] .map-badge {
+  background: rgba(184, 134, 11, 0.15);
+  border-color: #b8860b;
+  color: #ffd700;
+}
+
+.map-card[data-map="ice03"] .map-badge {
+  background: rgba(95, 158, 160, 0.15);
+  border-color: #5f9ea0;
+  color: #add8e6;
+}
+
+.map-card[data-map="factory07"] .map-badge {
+  background: rgba(112, 128, 144, 0.15);
+  border-color: #778899;
+  color: #b0c4de;
+}
+
+.map-card[data-map="space02"] .map-badge {
+  background: rgba(138, 43, 226, 0.15);
+  border-color: #8a2be2;
+  color: #d8bfd8;
+}
+
 .map-card .map-name {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-light);
 }
 
-/* Mode Selection Styles */
-.mode-selection {
+.map-select-container {
   margin-top: 1rem;
   margin-bottom: 0.5rem;
   text-align: center;
 }
 
-.mode-selection h3 {
+.map-select-container h3 {
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-light);
@@ -819,93 +953,62 @@ body {
   letter-spacing: 1px;
 }
 
-.mode-options {
-  display: flex;
-  justify-content: center;
-  gap: 1.25rem;
-}
-
-.mode-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 0.75rem 1.5rem;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 140px;
-}
-
-.mode-card:hover {
-  border-color: rgba(0, 210, 255, 0.4);
-  background: rgba(0, 210, 255, 0.03);
-}
-
-.mode-card.active {
-  border-color: var(--accent-blue);
-  background: rgba(0, 210, 255, 0.08);
-  box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
-}
-
-.mode-card .mode-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text-light);
-}
-
-.mode-card.active .mode-name {
-  color: #fff;
-}
-
-/* CPU Selection Styles */
-.cpu-selection {
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-  text-align: center;
-}
-
-.cpu-selection h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-light);
-  margin-bottom: 0.75rem;
-  letter-spacing: 1px;
-}
-
-.cpu-options {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.cpu-opt-btn {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-dim);
+.glass-select {
   font-family: var(--font-family);
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-light);
+  font-size: 1rem;
   font-weight: 600;
-  padding: 0.6rem 1.8rem;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  font-size: 0.95rem;
   outline: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2300d2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1.2em;
+  padding-right: 2.5rem;
 }
 
-.cpu-opt-btn:hover {
+.glass-select:hover {
   border-color: rgba(0, 210, 255, 0.4);
   background: rgba(0, 210, 255, 0.03);
-  color: var(--text-light);
 }
 
-.cpu-opt-btn.active {
+.glass-select:focus {
   border-color: var(--accent-blue);
-  background: rgba(0, 210, 255, 0.12);
-  color: var(--accent-blue);
-  box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.25);
+  background: rgba(0, 210, 255, 0.08);
+}
+
+.glass-select option {
+  background: #0a1932;
+  color: var(--text-light);
+  font-family: var(--font-family);
+}
+
+/* Mode & CPU Select Container Styles */
+.mode-select-container,
+.cpu-select-container {
+  max-width: 320px;
+  margin: 1rem auto 0.5rem auto;
+  text-align: center;
+}
+
+.mode-select-container h3,
+.cpu-select-container h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+  letter-spacing: 1px;
 }
 
 /* Team Slots Styles */
@@ -1198,20 +1301,79 @@ body.is-mobile .glass-panel {
 
 /* Lobby screen scaling */
 body.is-mobile #lobby-screen {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  justify-content: flex-start;
-  padding: 1.5rem 0.5rem;
+  padding: 8px;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
 }
 
 body.is-mobile .main-menu {
   width: 100%;
-  max-width: 440px;
-  gap: 0.55rem;
+  max-width: 460px;
+  height: 96dvh;
+  max-height: none;
+  padding: 0.75rem 1rem;
+  gap: 0.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  margin: auto 0;
+  overflow: hidden;
+}
+
+body.is-mobile .lobby-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body.is-mobile .lobby-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 6px 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+body.is-mobile .lobby-tab-btn.active {
+  background: rgba(0, 210, 255, 0.15);
+  color: var(--accent-blue);
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.1);
+}
+
+body.is-mobile .lobby-content-container {
+  display: block; /* 取消雙欄 */
+  flex: 1;
+  overflow: hidden;
+}
+
+body.is-mobile .lobby-tab-content {
+  display: none !important; /* 手機上預設隱藏所有分頁 */
+  height: 100%;
+  overflow-y: auto; /* 手機分頁內容若過長，在此處滾動 */
+  padding-right: 0;
+}
+
+body.is-mobile .lobby-tab-content.active {
+  display: flex !important; /* 僅顯示 active 的分頁 */
+  flex-direction: column;
+}
+
+/* 手機版操作說明分頁專用樣式 */
+body.is-mobile #lobby-tab-instructions {
+  display: none !important; 
+}
+body.is-mobile #lobby-tab-instructions.active {
+  display: flex !important;
 }
 
 body.is-mobile .title-container {
@@ -1236,6 +1398,22 @@ body.is-mobile .map-selection {
 body.is-mobile .map-selection h3 {
   margin-bottom: 0.4rem;
   font-size: 0.95rem;
+}
+
+body.is-mobile .map-select-container {
+  margin-top: 0.25rem;
+}
+
+body.is-mobile .map-select-container h3 {
+  margin-bottom: 0.4rem;
+  font-size: 0.95rem;
+}
+
+body.is-mobile .glass-select {
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  background-position: right 0.75rem center;
 }
 
 body.is-mobile .map-options {
@@ -1281,23 +1459,20 @@ body.is-mobile .char-stats {
   display: none; /* Hide stats in selection to fit grid on smaller screens */
 }
 
-body.is-mobile .cpu-selection {
+body.is-mobile .cpu-select-container,
+body.is-mobile .mode-select-container {
   margin-top: 0.25rem;
 }
 
-body.is-mobile .cpu-selection h3 {
+body.is-mobile .cpu-select-container h3,
+body.is-mobile .mode-select-container h3 {
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
 }
 
-body.is-mobile .cpu-opt-btn {
-  padding: 0.4rem 1.25rem;
-  font-size: 0.85rem;
-  border-radius: 8px;
-}
-
 body.is-mobile .instructions-panel {
-  display: none; /* Hide keyboard guides */
+  display: block !important; /* 顯示操作說明，因原樣式在 is-mobile 會設為 none */
+  margin-top: 0.5rem;
 }
 
 body.is-mobile .main-menu .actions {
@@ -1323,7 +1498,8 @@ body.is-mobile .team-selection h3 {
 body.is-mobile .team-slots {
   gap: 0.4rem;
   margin-top: 0.2rem;
-  max-height: 100px;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 body.is-mobile .team-slot-card {
@@ -1933,6 +2109,25 @@ body.is-mobile #result-title {
     font-size: 0.85rem;
   }
 
+  body.is-mobile .map-select-container {
+    grid-area: map;
+    align-self: center;
+    margin: 0;
+    text-align: left;
+  }
+
+  body.is-mobile .map-select-container h3 {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  body.is-mobile .map-select-container .glass-select {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    background-position: right 0.75rem center;
+  }
+
   body.is-mobile .map-options {
     gap: 0.5rem;
     justify-content: flex-start;
@@ -1977,26 +2172,23 @@ body.is-mobile #result-title {
     font-size: 0.75rem;
   }
 
-  body.is-mobile .cpu-selection {
+  body.is-mobile .cpu-select-container {
     grid-area: cpu;
     align-self: start;
     text-align: left;
     margin: 0;
   }
   
-  body.is-mobile .cpu-selection h3 {
+  body.is-mobile .cpu-select-container h3 {
     margin-bottom: 0.4rem;
     font-size: 0.9rem;
   }
-  
-  body.is-mobile .cpu-options {
-    justify-content: flex-start;
-    gap: 0.5rem;
-  }
-  
-  body.is-mobile .cpu-opt-btn {
-    padding: 0.35rem 1rem;
-    font-size: 0.8rem;
+
+  body.is-mobile .cpu-select-container .glass-select {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    background-position: right 0.75rem center;
   }
 
   body.is-mobile .main-menu .actions {
@@ -2027,7 +2219,8 @@ body.is-mobile #result-title {
   body.is-mobile .team-slots {
     grid-template-columns: repeat(3, 1fr);
     gap: 0.3rem;
-    max-height: 80px;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   /* Game Screen Landscape */

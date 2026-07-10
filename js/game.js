@@ -313,15 +313,33 @@ class Game {
         sfx.playClick();
       } else if (moveRight) {
         const currentRow = rows[this.lobbyRowIdx];
-        this.lobbyColIdx = (this.lobbyColIdx + 1) % currentRow.length;
-        sfx.playClick();
+        const target = currentRow[this.lobbyColIdx];
+        if (target && target.tagName === 'SELECT') {
+          target.selectedIndex = (target.selectedIndex + 1) % target.options.length;
+          target.dispatchEvent(new Event('change'));
+          sfx.playClick();
+        } else {
+          this.lobbyColIdx = (this.lobbyColIdx + 1) % currentRow.length;
+          sfx.playClick();
+        }
       } else if (moveLeft) {
         const currentRow = rows[this.lobbyRowIdx];
-        this.lobbyColIdx = (this.lobbyColIdx - 1 + currentRow.length) % currentRow.length;
-        sfx.playClick();
+        const target = currentRow[this.lobbyColIdx];
+        if (target && target.tagName === 'SELECT') {
+          target.selectedIndex = (target.selectedIndex - 1 + target.options.length) % target.options.length;
+          target.dispatchEvent(new Event('change'));
+          sfx.playClick();
+        } else {
+          this.lobbyColIdx = (this.lobbyColIdx - 1 + currentRow.length) % currentRow.length;
+          sfx.playClick();
+        }
       } else if (doClick) {
         const target = rows[this.lobbyRowIdx][this.lobbyColIdx];
-        if (target) target.click();
+        if (target) {
+          if (target.tagName !== 'SELECT') {
+            target.click();
+          }
+        }
       }
       this.updateMenuFocus();
       return;
@@ -360,6 +378,16 @@ class Game {
             target.classList.add('gamepad-focused');
             // Ensure the focused element is visible within the scrollable lobby screen
             target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+            // 自動頁籤同步邏輯
+            const tabContent = target.closest('.lobby-tab-content');
+            if (tabContent && !tabContent.classList.contains('active')) {
+              const tabId = tabContent.id.replace('lobby-tab-', '');
+              const tabBtn = document.querySelector(`.lobby-tab-btn[data-tab="${tabId}"]`);
+              if (tabBtn) {
+                tabBtn.click();
+              }
+            }
           }
         }
       }
@@ -399,37 +427,59 @@ class Game {
   getLobbyRows() {
     const rows = [];
     
-    // Row 0: Map selection (visually first)
-    const maps = Array.from(document.querySelectorAll('.map-card'));
-    if (maps.length > 0) rows.push(maps);
+    // Helper to filter out elements that are hidden (having offsetWidth/offsetHeight 0)
+    const isVisible = el => el.offsetWidth > 0 || el.offsetHeight > 0;
 
-    // Row 1: Mode selection (visually second)
-    const modes = Array.from(document.querySelectorAll('.mode-card'));
-    if (modes.length > 0) rows.push(modes);
-    
-    // Row 2: P1 character selection
-    const p1Chars = Array.from(document.querySelectorAll('.p1-grid .char-card'));
+    // Row: Lobby tab buttons (visible only on mobile/tablet)
+    const tabs = Array.from(document.querySelectorAll('.lobby-tab-btn')).filter(isVisible);
+    if (tabs.length > 0) rows.push(tabs);
+
+    // Row: Map selection (Settings column / Tab 1)
+    const mapSelect = document.getElementById('map-select');
+    if (mapSelect && isVisible(mapSelect)) {
+      rows.push([mapSelect]);
+    }
+
+    // Row: Mode selection (Settings column / Tab 1)
+    const modeSelect = document.getElementById('mode-select');
+    if (modeSelect && isVisible(modeSelect)) {
+      rows.push([modeSelect]);
+    }
+
+    // Row: LAN setup input and connect button (Settings column / Tab 1 - net mode)
+    const netIp = document.getElementById('net-server-ip');
+    const netConnect = document.getElementById('net-connect-btn');
+    if (netIp && netConnect && isVisible(netIp)) {
+      rows.push([netIp, netConnect]);
+    }
+
+    // Row: CPU selection (Settings column / Tab 1 - offline mode)
+    const cpuSelect = document.getElementById('cpu-select');
+    if (cpuSelect && isVisible(cpuSelect)) {
+      rows.push([cpuSelect]);
+    }
+
+    // Row: P1 character selection (Characters column / Tab 2)
+    const p1Chars = Array.from(document.querySelectorAll('.p1-grid .char-card')).filter(isVisible);
     if (p1Chars.length > 0) rows.push(p1Chars);
-    
-    // Row 3: P2 character selection (only if visible)
+
+    // Row: P2 character selection (Characters column / Tab 2 - 2P mode only)
     const p2Sel = document.querySelector('.p2-selection');
-    if (p2Sel && p2Sel.style.display !== 'none') {
-      const p2Chars = Array.from(document.querySelectorAll('.p2-grid .char-card'));
+    if (p2Sel && isVisible(p2Sel)) {
+      const p2Chars = Array.from(document.querySelectorAll('.p2-grid .char-card')).filter(isVisible);
       if (p2Chars.length > 0) rows.push(p2Chars);
     }
-    
-    // Row 4: CPU selection
-    const cpus = Array.from(document.querySelectorAll('.cpu-opt-btn'));
-    if (cpus.length > 0) rows.push(cpus);
-    
-    // Row 5: Team toggles (only clickable ones)
-    const teamToggles = Array.from(document.querySelectorAll('.team-toggle-btn')).filter(btn => !btn.disabled);
+
+    // Row: Team toggles (Characters column / Tab 2)
+    const teamToggles = Array.from(document.querySelectorAll('.team-toggle-btn')).filter(btn => !btn.disabled && isVisible(btn));
     if (teamToggles.length > 0) rows.push(teamToggles);
-    
-    // Row 6: Start button
+
+    // Row: Start button (Footer - visible on all tabs/columns)
     const startBtn = document.getElementById('start-btn');
-    if (startBtn) rows.push([startBtn]);
-    
+    if (startBtn && isVisible(startBtn)) {
+      rows.push([startBtn]);
+    }
+
     return rows;
   }
 
@@ -450,22 +500,49 @@ class Game {
   }
 
   setupLobby() {
-    // Mode selection cards
-    const modeCards = document.querySelectorAll('.mode-card');
-    modeCards.forEach(card => {
-      card.addEventListener('click', () => {
+    // 1. 初始化大廳頁籤 (Mobile/Tablet 適用)
+    const tabBtns = document.querySelectorAll('.lobby-tab-btn');
+    const tabContents = document.querySelectorAll('.lobby-tab-content');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.dataset.tab;
+        
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        tabContents.forEach(c => {
+          if (c.id === `lobby-tab-${tabId}`) {
+            c.classList.add('active');
+          } else {
+            c.classList.remove('active');
+          }
+        });
+        
+        if (typeof sfx !== 'undefined' && sfx.playClick) {
+          sfx.playClick();
+        }
+      });
+    });
+
+    // Mode selection dropdown
+    const modeSelect = document.getElementById('mode-select');
+    if (modeSelect) {
+      // Sync initial mode
+      this.is2PMode = modeSelect.value === '2p';
+      this.isNetMode = modeSelect.value === 'net';
+
+      modeSelect.addEventListener('change', () => {
         sfx.playClick();
-        modeCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        this.is2PMode = card.dataset.mode === '2p';
-        this.isNetMode = card.dataset.mode === 'net';
+        const selectedMode = modeSelect.value;
+        this.is2PMode = selectedMode === '2p';
+        this.isNetMode = selectedMode === 'net';
 
         // Toggle character selection headers and Player 2 selection visibility
         const p2Sel = document.querySelector('.p2-selection');
         const p1Title = document.querySelector('.p1-selection h3');
         const guide1p = document.getElementById('controls-guide-1p');
         const guide2p = document.getElementById('controls-guide-2p');
-        const cpuSel = document.querySelector('.cpu-selection');
+        const cpuSel = document.querySelector('.cpu-select-container');
         const teamSel = document.querySelector('.team-selection');
         const netPanel = document.getElementById('net-setup-panel');
         const startBtn = document.getElementById('start-btn');
@@ -491,9 +568,9 @@ class Game {
           if (teamSel) teamSel.style.display = 'block';
           if (netPanel) netPanel.style.display = 'none';
 
-          // Restore cpuCount from the active CPU buttons
-          const activeCpuBtn = document.querySelector('.cpu-opt-btn.active');
-          this.cpuCount = activeCpuBtn ? parseInt(activeCpuBtn.dataset.cpu, 10) : 3;
+          // Restore cpuCount from the CPU select dropdown
+          const cpuSelect = document.getElementById('cpu-select');
+          this.cpuCount = cpuSelect ? parseInt(cpuSelect.value, 10) : 3;
 
           if (startBtn) {
             startBtn.disabled = false;
@@ -504,7 +581,7 @@ class Game {
 
         this.updateTeamSlotsUI();
       });
-    });
+    }
 
     const p1Cards = document.querySelectorAll('.p1-grid .char-card');
     p1Cards.forEach(card => {
@@ -535,42 +612,67 @@ class Game {
       });
     });
 
-    const mapCards = document.querySelectorAll('.map-card');
-    mapCards.forEach(card => {
-      card.addEventListener('click', () => {
-        sfx.playClick();
-        mapCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        this.selectedMap = card.dataset.map;
-
-        // Dynamically update the lobby sub-title and document title
-        const mapConf = MAPS_CONFIG[this.selectedMap];
+    const mapSelect = document.getElementById('map-select');
+    if (mapSelect) {
+      mapSelect.value = this.selectedMap || 'sea14';
+      const handleMapChange = () => {
+        this.selectedMap = mapSelect.value;
         const subTitleEl = document.querySelector('.sub-title');
-        if (subTitleEl) {
-          subTitleEl.textContent = `${mapConf.name} 經典關卡`;
+        if (this.selectedMap === 'random') {
+          document.title = "爆爆王 (Crazy Arcade) - 🎲 隨機地圖模式";
+          if (subTitleEl) {
+            subTitleEl.textContent = "🎲 正在隨機配置挑戰關卡...";
+            subTitleEl.classList.add('rolling-active');
+          }
+        } else {
+          const mapConf = MAPS_CONFIG[this.selectedMap];
+          if (mapConf) {
+            if (subTitleEl) {
+              subTitleEl.textContent = `${mapConf.name} 經典關卡`;
+              subTitleEl.classList.remove('rolling-active');
+            }
+            document.title = `爆爆王 (Crazy Arcade) - ${mapConf.name}`;
+          }
         }
-        document.title = `爆爆王 (Crazy Arcade) - ${mapConf.name}`;
-      });
-    });
-
-    const cpuBtns = document.querySelectorAll('.cpu-opt-btn');
-    cpuBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
+      };
+      mapSelect.addEventListener('change', () => {
         sfx.playClick();
-        cpuBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.cpuCount = parseInt(btn.dataset.cpu, 10);
-        this.updateTeamSlotsUI();
+        handleMapChange();
       });
-    });
+      handleMapChange();
+    }
+
+    // CPU selection dropdown
+    const cpuSelect = document.getElementById('cpu-select');
+    if (cpuSelect) {
+      // Sync initial CPU count
+      this.cpuCount = parseInt(cpuSelect.value, 10);
+
+      cpuSelect.addEventListener('change', () => {
+        sfx.playClick();
+        this.cpuCount = parseInt(cpuSelect.value, 10);
+        this.updateTeamSlotsUI();
+
+        // Implement the auto-jump tab logic (clicking the characters tab button)
+        const charTabBtn = document.querySelector('.lobby-tab-btn[data-tab="characters"]');
+        if (charTabBtn) {
+          charTabBtn.click();
+        }
+      });
+    }
 
     document.getElementById('start-btn').addEventListener('click', () => {
       sfx.playClick();
       if (this.isNetMode) {
         if (this.netRole === 'p1' && this.netPlayerCount >= 2) {
+          let mapToSend = this.selectedMap;
+          if (mapToSend === 'random') {
+            const mapKeys = Object.keys(MAPS_CONFIG).filter(key => key !== 'random');
+            mapToSend = mapKeys[Math.floor(Math.random() * mapKeys.length)];
+          }
           this.sendNetMessage({
             type: 'start_game',
-            selectedMap: this.selectedMap
+            selectedMap: mapToSend
           });
         }
       } else {
@@ -646,9 +748,14 @@ class Game {
       sfx.playClick();
       if (this.isNetMode) {
         if (this.netRole === 'p1') {
+          let mapToSend = this.selectedMap;
+          if (mapToSend === 'random') {
+            const mapKeys = Object.keys(MAPS_CONFIG).filter(key => key !== 'random');
+            mapToSend = mapKeys[Math.floor(Math.random() * mapKeys.length)];
+          }
           this.sendNetMessage({
             type: 'start_game',
-            selectedMap: this.selectedMap
+            selectedMap: mapToSend
           });
         }
       } else {
@@ -1055,6 +1162,22 @@ class Game {
       } else {
         document.body.classList.remove('is-tablet');
       }
+
+      // Move instruction panel to appropriate container dynamically
+      const instructions = document.querySelector('.instructions-panel');
+      if (instructions) {
+        if (isMobile) {
+          const tabInstructions = document.getElementById('lobby-tab-instructions');
+          if (tabInstructions && instructions.parentElement !== tabInstructions) {
+            tabInstructions.appendChild(instructions);
+          }
+        } else {
+          const tabChars = document.getElementById('lobby-tab-characters');
+          if (tabChars && instructions.parentElement !== tabChars) {
+            tabChars.appendChild(instructions);
+          }
+        }
+      }
     };
 
     checkMobile();
@@ -1319,7 +1442,12 @@ class Game {
       });
     }
 
-    const mapConf = MAPS_CONFIG[this.selectedMap];
+    this.currentMapKey = this.selectedMap;
+    if (this.currentMapKey === 'random') {
+      const mapKeys = Object.keys(MAPS_CONFIG).filter(key => key !== 'random');
+      this.currentMapKey = mapKeys[Math.floor(Math.random() * mapKeys.length)];
+    }
+    const mapConf = MAPS_CONFIG[this.currentMapKey];
     
     // Dynamically update document title on game start
     document.title = `爆爆王 (Crazy Arcade) - ${mapConf.name}`;
@@ -1355,6 +1483,8 @@ class Game {
     this.dartsProjectiles = [];
 
     this.grid = JSON.parse(JSON.stringify(mapConf.layout));
+    this.ensureSpawnSafety();
+    this.generateCrateItems();
     this.bubbles = [];
     this.flames = [];
     this.items = [];
@@ -1942,7 +2072,7 @@ class Game {
   drawBackground() {
     this.backgroundContainer.removeChildren();
     const bg = new PIXI.Graphics();
-    const mapConf = MAPS_CONFIG[this.selectedMap];
+    const mapConf = MAPS_CONFIG[this.currentMapKey || this.selectedMap];
     
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
@@ -1962,7 +2092,7 @@ class Game {
   drawMap() {
     this.mapContainer.removeChildren();
     const mainG = new PIXI.Graphics();
-    const mapConf = MAPS_CONFIG[this.selectedMap];
+    const mapConf = MAPS_CONFIG[this.currentMapKey || this.selectedMap];
 
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
@@ -2475,22 +2605,9 @@ class Game {
       if (this.isNetMode && this.netRole !== 'p1') {
         return; // Client waits for host to sync item
       }
-      if (Math.random() < 0.4) {
-        const rand = Math.random();
-        if (rand < 0.45) {
-          const standardTypes = [ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.SPEED_UP];
-          chosenType = standardTypes[Math.floor(Math.random() * standardTypes.length)];
-        } else if (rand < 0.58) {
-          chosenType = ITEM_TYPES.NEEDLE;
-        } else if (rand < 0.70) {
-          chosenType = ITEM_TYPES.DART;
-        } else if (rand < 0.85) {
-          const newPool = [ITEM_TYPES.KICK_SHOE, ITEM_TYPES.SPRING_SHOE, ITEM_TYPES.DEVIL];
-          chosenType = newPool[Math.floor(Math.random() * newPool.length)];
-        } else {
-          const petPool = [ITEM_TYPES.PET, ITEM_TYPES.PET_FAST_TURTLE, ITEM_TYPES.PET_SLOW_TURTLE];
-          chosenType = petPool[Math.floor(Math.random() * petPool.length)];
-        }
+      const key = `${col}_${row}`;
+      if (this.crateItems && this.crateItems[key] !== undefined) {
+        chosenType = this.crateItems[key];
       }
     }
 
@@ -3359,6 +3476,10 @@ class Game {
   }
 
   updateCharacterStates(char, dt) {
+    if (char.state === 'dying' && !char.hasDroppedBuffOnDeath) {
+      this.dropBuffOnDeath(char);
+    }
+
     if (char.invincibilityTimer && char.invincibilityTimer > 0) {
       char.invincibilityTimer -= dt;
     }
@@ -4058,7 +4179,7 @@ class Game {
   }
 
   spawnCrateParticles(col, row) {
-    const mapConf = MAPS_CONFIG[this.selectedMap];
+    const mapConf = MAPS_CONFIG[this.currentMapKey || this.selectedMap];
     const color = mapConf.crateColor || 0xbf7130;
     const cx = col * TILE_SIZE + TILE_SIZE / 2;
     const cy = row * TILE_SIZE + TILE_SIZE / 2;
@@ -4281,5 +4402,142 @@ class Game {
 
     this.resultOverlay.classList.add('active');
     this.resetMenuFocus();
+  }
+
+  ensureSpawnSafety() {
+    // Corner spawns (width = 15, height = 13)
+    const corners = [
+      { r: 0, c: 0, adjR: [0, 1], adjC: [1, 0], safeR: 1, safeC: 1 },         // Top-Left
+      { r: 0, c: 14, adjR: [0, 1], adjC: [13, 14], safeR: 1, safeC: 13 },     // Top-Right
+      { r: 12, c: 0, adjR: [12, 11], adjC: [1, 0], safeR: 11, safeC: 1 },     // Bottom-Left
+      { r: 12, c: 14, adjR: [12, 11], adjC: [13, 14], safeR: 11, safeC: 13 }  // Bottom-Right
+    ];
+
+    corners.forEach(corner => {
+      if (this.grid[corner.r] !== undefined && this.grid[corner.r][corner.c] !== undefined) {
+        this.grid[corner.r][corner.c] = 0;
+      }
+      if (this.grid[corner.adjR[0]] !== undefined && this.grid[corner.adjR[0]][corner.adjC[0]] !== undefined) {
+        this.grid[corner.adjR[0]][corner.adjC[0]] = 0;
+      }
+      if (this.grid[corner.adjR[1]] !== undefined && this.grid[corner.adjR[1]][corner.adjC[1]] !== undefined) {
+        this.grid[corner.adjR[1]][corner.adjC[1]] = 0;
+      }
+      if (this.grid[corner.safeR] !== undefined && this.grid[corner.safeR][corner.safeC] !== undefined) {
+        this.grid[corner.safeR][corner.safeC] = 0;
+      }
+    });
+
+    // Center/Middle spawns
+    const middles = [
+      { r: 6, c: 7 }, // Center
+      { r: 4, c: 7 }, // Top-Middle
+      { r: 8, c: 7 }  // Bottom-Middle
+    ];
+
+    middles.forEach(mid => {
+      if (this.grid[mid.r] !== undefined && this.grid[mid.r][mid.c] !== undefined) {
+        this.grid[mid.r][mid.c] = 0;
+      }
+      if (this.grid[mid.r] !== undefined && this.grid[mid.r][mid.c - 1] !== undefined) {
+        this.grid[mid.r][mid.c - 1] = 0;
+      }
+      if (this.grid[mid.r - 1] !== undefined && this.grid[mid.r - 1][mid.c - 1] !== undefined) {
+        this.grid[mid.r - 1][mid.c - 1] = 0;
+      }
+      if (this.grid[mid.r + 1] !== undefined && this.grid[mid.r + 1][mid.c - 1] !== undefined) {
+        this.grid[mid.r + 1][mid.c - 1] = 0;
+      }
+    });
+  }
+
+  generateCrateItems() {
+    this.crateItems = {};
+    const crates = [];
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        if (this.grid[r][c] === 2) {
+          crates.push({ r, c });
+        }
+      }
+    }
+
+    // Shuffle crates
+    for (let i = crates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [crates[i], crates[j]] = [crates[j], crates[i]];
+    }
+
+    // Define a fixed pool of items
+    const itemPool = [
+      ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.BUBBLE_UP, ITEM_TYPES.BUBBLE_UP,
+      ITEM_TYPES.LENGTH_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.LENGTH_UP, ITEM_TYPES.LENGTH_UP,
+      ITEM_TYPES.SPEED_UP, ITEM_TYPES.SPEED_UP, ITEM_TYPES.SPEED_UP, ITEM_TYPES.SPEED_UP, ITEM_TYPES.SPEED_UP,
+      ITEM_TYPES.NEEDLE, ITEM_TYPES.NEEDLE, ITEM_TYPES.NEEDLE,
+      ITEM_TYPES.DART, ITEM_TYPES.DART,
+      ITEM_TYPES.KICK_SHOE, ITEM_TYPES.SPRING_SHOE, ITEM_TYPES.DEVIL,
+      ITEM_TYPES.PET, ITEM_TYPES.PET_FAST_TURTLE, ITEM_TYPES.PET_SLOW_TURTLE
+    ];
+
+    // Assign items to shuffled crates
+    const assignCount = Math.min(crates.length, itemPool.length);
+    for (let i = 0; i < assignCount; i++) {
+      const crate = crates[i];
+      const key = `${crate.c}_${crate.r}`;
+      this.crateItems[key] = itemPool[i];
+    }
+  }
+
+  dropBuffOnDeath(char) {
+    if (!char || char.hasDroppedBuffOnDeath) return;
+    char.hasDroppedBuffOnDeath = true;
+
+    // In online mode, only Host (p1) decides item drops and broadcasts them.
+    if (this.isNetMode && this.netRole !== 'p1') {
+      return;
+    }
+
+    const charKey = char.charKey || 'bazzi';
+    const conf = CHARACTER_CONFIGS[charKey];
+    if (!conf) return;
+
+    // Determine initial stats
+    const initialMaxBubbles = char.isCPU ? (conf.maxBubbles + 1) : conf.maxBubbles;
+    const initialBubbleLength = conf.maxLen;
+    const initialSpeed = conf.speed;
+
+    const bubbleUpCount = Math.max(0, char.maxBubbles - initialMaxBubbles);
+    const lengthUpCount = Math.max(0, char.bubbleLength - initialBubbleLength);
+    const currentSpeedVal = (char.speedBeforePet !== undefined) ? char.speedBeforePet : char.speed;
+    const speedUpCount = Math.max(0, Math.round((currentSpeedVal - initialSpeed) / 0.3));
+
+    const activeBuffs = [];
+    for (let i = 0; i < bubbleUpCount; i++) activeBuffs.push(ITEM_TYPES.BUBBLE_UP);
+    for (let i = 0; i < lengthUpCount; i++) activeBuffs.push(ITEM_TYPES.LENGTH_UP);
+    for (let i = 0; i < speedUpCount; i++) activeBuffs.push(ITEM_TYPES.SPEED_UP);
+
+    if (activeBuffs.length > 0) {
+      const randIdx = Math.floor(Math.random() * activeBuffs.length);
+      const droppedItemType = activeBuffs[randIdx];
+
+      // Reduce char's stats
+      if (droppedItemType === ITEM_TYPES.BUBBLE_UP) {
+        char.maxBubbles = Math.max(initialMaxBubbles, char.maxBubbles - 1);
+      } else if (droppedItemType === ITEM_TYPES.LENGTH_UP) {
+        char.bubbleLength = Math.max(initialBubbleLength, char.bubbleLength - 1);
+      } else if (droppedItemType === ITEM_TYPES.SPEED_UP) {
+        if (char.speedBeforePet !== undefined) {
+          char.speedBeforePet = Math.max(initialSpeed, char.speedBeforePet - 0.3);
+        } else {
+          char.speed = Math.max(initialSpeed, char.speed - 0.3);
+        }
+      }
+
+      const col = Math.min(GRID_COLS - 1, Math.max(0, Math.floor(char.x / TILE_SIZE)));
+      const row = Math.min(GRID_ROWS - 1, Math.max(0, Math.floor(char.y / TILE_SIZE)));
+
+      // Spawn this item at character's current grid position
+      this.destroyCrate(col, row, droppedItemType);
+    }
   }
 }
